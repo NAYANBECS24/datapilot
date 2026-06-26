@@ -130,7 +130,7 @@ def _call_llm_stream(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
     else:
         stream = client.chat.completions.create(
             model=model,
-            max_tokens=4000,
+            max_tokens=8192,
             tools=tools,
             messages=messages,
             stream=True,
@@ -259,7 +259,7 @@ def run_agent_turn_stream(
             yield {"type": "stream_end", "content": ""}
             return
 
-        messages.append({"role": "assistant", "content": msg.content, "tool_calls": msg.tool_calls})
+        messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": msg.tool_calls})
         tool_results = []
 
         for tc in msg.tool_calls:
@@ -314,7 +314,7 @@ def run_agent_turn_stream(
 def _call_openai_compat(client, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
     response = client.chat.completions.create(
         model=model,
-        max_tokens=4000,
+        max_tokens=8192,
         tools=tools,
         messages=messages,
     )
@@ -450,25 +450,29 @@ DASHBOARDS:
   Pick diverse chart types (mix of bar, line, pie, scatter, choropleth).
 
 RULES:
-   1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
-      This also discovers any user-uploaded tables.
-   2. Only write read-only SELECT queries. Never DML/DDL.
-   3. When a chart or diagram helps, call generate_chart or generate_flowchart.
-   4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
-      Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
-   5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
-   6. After getting data, write a short clear summary with real numbers.
-   7. Suggest one follow-up question the user might ask next.
-   8. Be concise. Let charts and diagrams do the heavy lifting.
+    1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
+       This also discovers any user-uploaded tables.
+    2. Only write read-only SELECT queries. Never DML/DDL.
+    3. When a chart or diagram helps, call generate_chart or generate_flowchart.
+    4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
+       Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
+    5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
+    6. After getting data, write a short clear summary with real numbers.
+    7. Suggest one follow-up question the user might ask next.
+    8. Be concise. Let charts and diagrams do the heavy lifting.
    9. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
-      a time period), ask a short clarifying question instead of guessing.
-  10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
-      in follow-up questions. They refer to entities from the previous turn, not all data.
-  11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
-      You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
-  12. DOCUMENTS (RAG): When a user asks about document/report content, call retrieve_context
-      to search uploaded PDF/TXT/MD files. Use the passages to inform your answer and cite the
-      filename. You can combine document context with database results.
+       a time period), ask a short clarifying question instead of guessing.
+   10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
+       in follow-up questions. They refer to entities from the previous turn, not all data.
+   11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
+       You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
+   12. DOCUMENTS (RAG): When a user asks about document/report content, call retrieve_context
+       to search uploaded PDF/TXT/MD files. Use the passages to inform your answer and cite the
+       filename. You can combine document context with database results.
+   13. KEEP REASONING BRIEF: Do not write long chains of thought before calling a tool.
+       Call the tool immediately — tool arguments must be complete and never truncated.
+   14. When writing SQL, write the complete query including FROM, JOIN, WHERE, GROUP BY,
+       and LIMIT clauses. Never let the SQL be cut short.
 """
 
 TOOLS = [
@@ -720,7 +724,7 @@ def run_agent_turn(
                 "sql_queries": sql_queries,
             }
 
-        messages.append({"role": "assistant", "content": msg.content, "tool_calls": msg.tool_calls})
+        messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": msg.tool_calls})
         tool_results = []
 
         for tc in msg.tool_calls:
