@@ -129,6 +129,8 @@ streamlit run app.py
 
 Open **http://localhost:8501**
 
+**Live demo:** [datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
+
 ---
 
 ## Docker (alternative)
@@ -369,18 +371,6 @@ OPENAI_API_KEY = "nvapi-..."    # your NVIDIA API key
 docker compose up --build
 # visit http://localhost:8501
 ```
-
----
-
-## Evaluation Criteria Coverage
-
-| Criteria | Weight | How DataPilot Addresses It |
-|---|---|---|---|
-| Functionality | 30% | All 5 required tools, SQL upload/SQLite DB upload, 4 chart types, 3 diagram types, multi-turn convos |
-| Tool Design & Architecture | 25% | Clean schemas, modular tools/agent split, multi-DB, per-user auth isolation, file-mode context |
-| Visualization Quality | 20% | Plotly interactive charts with auto-detection, Mermaid diagrams, glassmorphism dark/light theme |
-| User Experience | 15% | Login/register portal, My Data tab, streaming, voice, multi-language, anomaly scanner, dashboard |
-| Innovation & Creativity | 10% | Self-healing SQL, decision trees, MongoDB, PDF export, trace sidebar, per-user upload isolation, Ask from File mode |
 
 ---
 
