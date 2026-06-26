@@ -17,8 +17,22 @@ def _get_conn() -> sqlite3.Connection:
         )
     """)
     conn.commit()
+    # auto-seed default users if table is empty (survives cloud deploys)
+    existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if existing == 0:
+        for u, p in [("admin", "admin123"), ("nayan", "nayan")]:
+            conn.execute(
+                "INSERT OR IGNORE INTO users (username, password_hash) VALUES (?, ?)",
+                (u, _hash(p)),
+            )
+            _ensure_upload_dir(u)
+        conn.commit()
     return conn
 
+
+def _ensure_upload_dir(username: str) -> None:
+    user_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", username)
+    os.makedirs(user_dir, exist_ok=True)
 
 def _hash(password: str, salt: str = "datapilot_salt_2026") -> str:
     return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
