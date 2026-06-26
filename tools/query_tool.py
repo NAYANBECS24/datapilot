@@ -14,7 +14,7 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
 def execute_query(db_path: Optional[str] = None, sql: str = "", conn_str: Optional[str] = None) -> Dict[str, Any]:
-    if conn_str:
+    if conn_str and not conn_str.lower().startswith("sqlite"):
         mgr = DatabaseManager(conn_str)
     elif db_path:
         mgr = DatabaseManager(f"sqlite:///{db_path}")
@@ -28,7 +28,8 @@ def execute_query(db_path: Optional[str] = None, sql: str = "", conn_str: Option
     safe_sql = check["sql"]
 
     if mgr.db_type == "sqlite":
-        return _sqlite_execute(mgr.params.get("database", ""), safe_sql)
+        db_file = db_path or mgr.params.get("database", "")
+        return _sqlite_execute(db_file, safe_sql)
     else:
         return mgr.execute_query(sql)
 

@@ -5,7 +5,7 @@ from tools.db_manager import DatabaseManager, get_db_manager
 
 
 def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) -> Dict[str, Any]:
-    if conn_str:
+    if conn_str and not conn_str.lower().startswith("sqlite"):
         mgr = DatabaseManager(conn_str)
     elif db_path:
         mgr = DatabaseManager(f"sqlite:///{db_path}")

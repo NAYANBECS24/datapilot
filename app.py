@@ -547,11 +547,7 @@ SCHEMA_CACHE = None
 def _get_schema():
     global SCHEMA_CACHE
     if SCHEMA_CACHE is None:
-        conn_str = st.session_state.get("db_conn_str", "")
-        if conn_str:
-            SCHEMA_CACHE = get_schema(conn_str=conn_str)
-        else:
-            SCHEMA_CACHE = get_schema(_db_path)
+        SCHEMA_CACHE = get_schema(_db_path)
     return SCHEMA_CACHE
 
 def _invalidate_schema_cache():
@@ -680,9 +676,10 @@ with st.sidebar:
             st.rerun()
 
         st.caption("Database Connection")
+        default_db_url = f"sqlite:///{_db_path}"
         db_url = st.text_input(
             "Connection string",
-            value=st.session_state.db_conn_str or "sqlite:///db/sample_ecommerce.db",
+            value=st.session_state.db_conn_str or default_db_url,
             label_visibility="collapsed",
             placeholder="sqlite:///path/to/db or postgresql://user:pass@host/db",
         )
@@ -1180,9 +1177,7 @@ with tab_profiler:
     )
     st.caption("Select a table to inspect its schema, stats, and sample data.")
 
-    conn_str = st.session_state.get("db_conn_str", "")
-    db_path = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-    sr = get_schema(db_path, conn_str=conn_str)
+    sr = get_schema(_db_path)
 
     if sr.get("success"):
         tables = list(sr["schema"]["tables"].keys())
@@ -1190,7 +1185,7 @@ with tab_profiler:
 
         if selected:
             with st.spinner(f"Profiling `{selected}`..."):
-                r = execute_query(db_path, f"SELECT * FROM {selected} LIMIT 1000", conn_str=conn_str)
+                r = execute_query(_db_path, f"SELECT * FROM {selected} LIMIT 1000")
                 if r.get("success"):
                     rows, cols = r["rows"], r["columns"]
                     df = pd.DataFrame(rows, columns=cols)
@@ -1243,9 +1238,7 @@ with tab_insights:
 
     if st.button("🔄 Generate Report", use_container_width=True, type="primary"):
         with st.spinner("Running analysis..."):
-            conn_str = st.session_state.get("db_conn_str", "")
-            db_path = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-            st.session_state.auto_insights = generate_auto_insights(db_path, conn_str=conn_str)
+            st.session_state.auto_insights = generate_auto_insights(_db_path)
 
     if st.session_state.auto_insights:
         rpt = st.session_state.auto_insights
