@@ -59,6 +59,12 @@ for k, v in _DEFAULT.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# Persist login across page reloads via query param
+if not st.session_state.user:
+    saved = st.query_params.get("user")
+    if saved:
+        st.session_state.user = saved
+
 if not st.session_state.user:
     st.markdown(f"""
     <style>
@@ -217,9 +223,10 @@ if not st.session_state.user:
             lpw = st.text_input("Password", type="password", placeholder="Enter your password")
             if st.form_submit_button("Login", use_container_width=True, type="primary"):
                 r = login(lun, lpw)
-                if r["success"]:
-                    st.session_state.user = r["username"]
-                    st.rerun()
+                    if r["success"]:
+                        st.session_state.user = r["username"]
+                        st.query_params["user"] = r["username"]
+                        st.rerun()
                 else:
                     st.error(r["error"])
     with tab_reg:
@@ -1228,6 +1235,7 @@ with st.sidebar:
         if st.button("🚪 Logout", use_container_width=True, type="secondary"):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
+            st.query_params.clear()
             st.rerun()
 
     u1, u2 = st.columns(2)
