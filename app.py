@@ -141,8 +141,8 @@ if not st.session_state.user:
         .login-dot:nth-child(7) {{ top: 90%; left: 40%; animation-delay: 1.8s; }}
         .login-dot:nth-child(8) {{ top: 10%; left: 80%; animation-delay: 3.0s; }}
 
-        /* Card styling — targets the middle column container on login page */
-        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child {{
+        /* Card styling — applied to the vertical block holding all column content */
+        div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] {{
             background: rgba(10, 12, 22, 0.75) !important;
             backdrop-filter: blur(24px) !important;
             -webkit-backdrop-filter: blur(24px) !important;
@@ -150,15 +150,10 @@ if not st.session_state.user:
             border-radius: 20px !important;
             padding: 2.5rem 2rem !important;
             box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,170,0.04) !important;
-            max-width: 440px; margin: 0 auto;
         }}
-        /* Remove extra spacing from Streamlit's auto-wrapping in the card */
-        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child > div {{
+        /* Remove gap between card elements */
+        div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] > div {{
             margin-bottom: 0 !important;
-        }}
-        /* Make title + subtitle tabs appear inside the card */
-        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child > div:first-child {{
-            padding-top: 0 !important;
         }}
 
         @keyframes barPulse {{
@@ -223,10 +218,10 @@ if not st.session_state.user:
             lpw = st.text_input("Password", type="password", placeholder="Enter your password")
             if st.form_submit_button("Login", use_container_width=True, type="primary"):
                 r = login(lun, lpw)
-                    if r["success"]:
-                        st.session_state.user = r["username"]
-                        st.query_params["user"] = r["username"]
-                        st.rerun()
+                if r["success"]:
+                    st.session_state.user = r["username"]
+                    st.query_params["user"] = r["username"]
+                    st.rerun()
                 else:
                     st.error(r["error"])
     with tab_reg:
@@ -237,7 +232,6 @@ if not st.session_state.user:
                 r = register(run, rpw)
                 if r["success"]:
                     st.success("Registered! Login now.")
-                    st.session_state.auth_page = "login"
                 else:
                     st.error(r["error"])
     st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>', unsafe_allow_html=True)
