@@ -1,31 +1,126 @@
 import json
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 from tools.schema_tool import get_schema
 from tools.query_tool import execute_query
 from tools.chart_tool import generate_chart
 from tools.flowchart_tool import generate_flowchart
 from tools.insight_tool import prepare_explanation_context, detect_anomalies
+from tools.db_manager import DEFAULT_CONN_STRING
 from trace.tracer import AgentTracer, timed
 
 load_dotenv()
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
+DB_CONN_STRING = os.getenv("DATABASE_URL", "")
 MAX_SQL_RETRIES = 3
 
-NVIDIA_API_KEY = os.getenv("OPENAI_API_KEY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia").lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
 NVIDIA_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://integrate.api.nvidia.com/v1")
 
-if not NVIDIA_API_KEY:
-    raise RuntimeError(
-        "OPENAI_API_KEY not set. Copy .env.example -> .env and add your NVIDIA key "
-        "(starts with nvapi-)."
+LLM_DISPLAY_NAMES = {
+    "nvidia": f"NVIDIA {NVIDIA_MODEL}",
+    "openai": f"OpenAI {OPENAI_MODEL}",
+    "anthropic": f"Anthropic {ANTHROPIC_MODEL}",
+}
+
+
+def _get_llm_client():
+    if LLM_PROVIDER == "openai":
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY not set for OpenAI provider.")
+        from openai import OpenAI
+        return OpenAI(api_key=OPENAI_API_KEY)
+
+    elif LLM_PROVIDER == "anthropic":
+        if not ANTHROPIC_API_KEY:
+            raise RuntimeError("ANTHROPIC_API_KEY not set for Anthropic provider.")
+        from anthropic import Anthropic
+        return Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    else:
+        if not OPENAI_API_KEY:
+            raise RuntimeError(
+                "OPENAI_API_KEY not set. Copy .env.example -> .env and add your API key."
+            )
+        from openai import OpenAI
+        return OpenAI(api_key=OPENAI_API_KEY, base_url=NVIDIA_BASE_URL)
+
+
+def _call_llm(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
+    client = _get_llm_client()
+    model = NVIDIA_MODEL if LLM_PROVIDER == "nvidia" else (OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL)
+
+    try:
+        if LLM_PROVIDER == "anthropic":
+            return _call_anthropic(client, model, messages, tools)
+        else:
+            return _call_openai_compat(client, model, messages, tools)
+    except Exception as e:
+        raise RuntimeError(f"LLM API call failed ({LLM_PROVIDER}): {e}")
+
+
+def _call_openai_compat(client, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=4000,
+        tools=tools,
+        messages=messages,
+    )
+    return response.choices[0].message
+
+
+def _call_anthropic(client, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
+    system_msgs = [m for m in messages if m["role"] == "system"]
+    other_msgs = [m for m in messages if m["role"] != "system"]
+
+    system_content = system_msgs[0]["content"] if system_msgs else ""
+
+    anthropic_tools = []
+    for t in tools:
+        if t["type"] == "function":
+            anthropic_tools.append({
+                "name": t["function"]["name"],
+                "description": t["function"]["description"],
+                "input_schema": t["function"]["parameters"],
+            })
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=4000,
+        system=system_content,
+        tools=anthropic_tools if anthropic_tools else None,
+        messages=other_msgs,
+    )
+
+    class ToolCall:
+        def __init__(self, name, input_dict, tool_id):
+            self.type = "function"
+            self.id = tool_id
+            self.function = type("func", (), {"name": name, "arguments": json.dumps(input_dict)})()
+
+    class Message:
+        def __init__(self, content, tool_calls):
+            self.content = content
+            self.tool_calls = tool_calls
+
+    tool_calls = []
+    for block in response.content:
+        if block.type == "tool_use":
+            tool_calls.append(ToolCall(block.name, block.input, block.id))
+
+    return Message(
+        content=response.content[0].text if response.content and response.content[0].type == "text" else "",
+        tool_calls=tool_calls if tool_calls else None,
     )
 
 
@@ -66,9 +161,7 @@ LANGUAGES = {
     "de": "IMPORTANT: Respond in German. Use German for all explanations and summaries.",
 }
 
-LANGUAGE_INSTRUCTION = LANGUAGES.get("en", "")
-
-SYSTEM_PROMPT = f"""{LANGUAGE_INSTRUCTION}You are DataPilot, a conversational BI copilot for an e-commerce database.
+SYSTEM_PROMPT_TEMPLATE = """{lang_instruction}You are DataPilot, a conversational BI copilot for a database.
 
 TABLES AND COLUMNS (use these exact names):
 
@@ -177,9 +270,9 @@ TOOLS = [
 ]
 
 TOOL_IMPL: Dict[str, Any] = {
-    "get_schema": lambda **kw: get_schema(DB_PATH),
+    "get_schema": lambda **kw: get_schema(DB_PATH, conn_str=DB_CONN_STRING),
 
-    "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", "")),
+    "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", ""), conn_str=DB_CONN_STRING),
 
     "generate_chart": lambda **kw: generate_chart(
         _normalise_data(kw.get("data", [])),
@@ -210,43 +303,8 @@ def run_agent_turn(
     tracer: AgentTracer,
     language: str = "en",
 ) -> Dict[str, Any]:
-    client = OpenAI(api_key=NVIDIA_API_KEY, base_url=NVIDIA_BASE_URL)
-    model = NVIDIA_MODEL
-
     lang_instruction = LANGUAGES.get(language, "")
-    system_content = f"""{lang_instruction}You are DataPilot, a conversational BI copilot for an e-commerce database.
-
-TABLES AND COLUMNS (use these exact names):
-
-  customers(customer_id, name, email, city, signup_date)
-  products(product_id, name, category, price, cost)
-  orders(order_id, customer_id, order_date, status)
-  order_items(order_item_id, order_id, product_id, quantity, unit_price)
-  inventory(inventory_id, product_id, warehouse_location, stock_quantity)
-
-Also available for deeper analysis:
-  suppliers(supplier_id, name, contact_email, phone, city, supply_category)
-  reviews(review_id, product_id, customer_id, rating, review_text, review_date)
-  payments(payment_id, order_id, payment_method, amount, payment_date, transaction_id)
-  shipping(shipping_id, order_id, address, city, pincode, shipped_date, delivered_date, carrier)
-
-IMPORTANT COLUMN NOTES:
-  - products.name (NOT product_name) holds the product name
-  - Use products.name in your queries, never "product_name"
-  - Use customers.name (NOT customer_name) for customer names
-  - Use category from products for product categories
-
-RULES:
-  1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
-  2. Only write read-only SELECT queries. Never DML/DDL.
-  3. When a chart or diagram helps, call generate_chart or generate_flowchart.
-  4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
-     Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
-  5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
-  6. After getting data, write a short clear summary with real numbers.
-  7. Suggest one follow-up question the user might ask next.
-  8. Be concise. Let charts and diagrams do the heavy lifting.
-"""
+    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction)
 
     messages = [{"role": "system", "content": system_content}] + history + [{"role": "user", "content": user_message}]
 
@@ -256,15 +314,15 @@ RULES:
     sql_retry_count = 0
 
     while True:
-        response = client.chat.completions.create(
-            model=model,
-            max_tokens=2000,
-            tools=TOOLS,
-            messages=messages,
-        )
-
-        choice = response.choices[0]
-        msg = choice.message
+        try:
+            msg = _call_llm(messages, TOOLS)
+        except Exception as e:
+            return {
+                "reply": f"⚠️ Sorry, I encountered an error contacting the LLM provider (**{LLM_PROVIDER}**).\n\n> {e}\n\nPlease check your API key and try again.",
+                "charts": charts,
+                "diagrams": diagrams,
+                "sql_queries": sql_queries,
+            }
 
         if not msg.tool_calls:
             return {
@@ -318,3 +376,11 @@ RULES:
             })
 
         messages.extend(tool_results)
+
+
+def get_llm_status() -> Dict[str, Any]:
+    has_key = bool(os.getenv("OPENAI_API_KEY")) or bool(os.getenv("ANTHROPIC_API_KEY"))
+    provider = LLM_PROVIDER
+    model = NVIDIA_MODEL if provider == "nvidia" else (OPENAI_MODEL if provider == "openai" else ANTHROPIC_MODEL)
+    display = LLM_DISPLAY_NAMES.get(provider, f"{provider}/{model}")
+    return {"connected": has_key, "provider": provider, "model": model, "display": display}

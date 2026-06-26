@@ -1,0 +1,23 @@
+[project]
+name = "datapilot"
+version = "2.0.0"
+description = "Conversational BI Agent — NL to SQL, charts, diagrams, self-healing agent"
+authors = [{ name = "iTech Hackathon 2026 Team" }]
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.40",
+    "plotly>=5.22",
+    "openai>=1.60",
+    "python-dotenv>=1.0",
+    "pandas>=2.2",
+    "kaleido>=0.2.1",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg2-binary>=2.9"]
+mysql = ["pymysql>=1.1"]
+anthropic = ["anthropic>=0.50"]
+all = ["psycopg2-binary>=2.9", "pymysql>=1.1", "anthropic>=0.50"]
+
+[project.urls]
+Homepage = "https://github.com/NAYANBECS24/datapilot"

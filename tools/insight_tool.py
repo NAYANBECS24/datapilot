@@ -76,8 +76,15 @@ def detect_anomalies(
     return {"success": True, "mean": round(mean, 2), "stdev": round(stdev, 2), "anomalies": anomalies}
 
 
-def generate_auto_insights(db_path: str) -> Dict[str, Any]:
+def generate_auto_insights(db_path: str, conn_str: str = "") -> Dict[str, Any]:
     try:
+        if conn_str and conn_str.startswith("sqlite"):
+            actual_path = conn_str.split("://", 1)[-1] if "://" in conn_str else conn_str
+            db_path = actual_path or db_path
+
+        if conn_str and (conn_str.startswith("postgresql") or conn_str.startswith("postgres")):
+            return _generate_auto_insights_pg(conn_str)
+
         import sqlite3
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -176,6 +183,103 @@ def generate_auto_insights(db_path: str) -> Dict[str, Any]:
             "summary": summary,
             "recommendations": recommendations,
         }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _generate_auto_insights_pg(conn_str: str) -> Dict[str, Any]:
+    try:
+        import psycopg2
+        import psycopg2.extras
+
+        from tools.db_manager import parse_connection_string
+        params = parse_connection_string(conn_str)
+        pg_params = {k: v for k, v in params.items() if k != "type"}
+
+        conn = psycopg2.connect(**pg_params)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        metrics = {}
+
+        cur.execute("SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0) FROM order_items oi")
+        metrics["total_revenue"] = cur.fetchone()["coalesce"]
+
+        cur.execute("SELECT COUNT(*) FROM orders")
+        metrics["total_orders"] = cur.fetchone()["count"]
+
+        cur.execute("SELECT AVG(oi.quantity * oi.unit_price) FROM order_items oi")
+        avg = cur.fetchone()["avg"]
+        metrics["avg_order_value"] = avg if avg else 0
+
+        cur.execute("SELECT COUNT(DISTINCT customer_id) FROM orders")
+        metrics["active_customers"] = cur.fetchone()["count"]
+
+        trends = {}
+
+        cur.execute("""
+            SELECT to_char(o.order_date, 'YYYY-MM') as month,
+                   ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2) as revenue
+            FROM orders o
+            JOIN order_items oi ON o.order_id = oi.order_id
+            GROUP BY month ORDER BY month LIMIT 12
+        """)
+        trends["monthly_revenue"] = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT p.category, ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2) as revenue
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.product_id
+            GROUP BY p.category ORDER BY revenue DESC
+        """)
+        trends["category_revenue"] = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("SELECT status, COUNT(*)::int as count FROM orders GROUP BY status")
+        trends["order_status"] = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT p.name, ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2) as revenue
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.product_id
+            GROUP BY p.name ORDER BY revenue DESC LIMIT 10
+        """)
+        trends["top_products"] = [dict(r) for r in cur.fetchall()]
+
+        anomalies = []
+
+        monthly = trends.get("monthly_revenue", [])
+        if len(monthly) >= 3:
+            vals = [r["revenue"] for r in monthly]
+            mean = statistics.mean(vals)
+            stdev = statistics.pstdev(vals) or 1e-9
+            for r in monthly:
+                z = (r["revenue"] - mean) / stdev
+                if abs(z) >= 1.8:
+                    anomalies.append({"label": f"Revenue {r['month']}", "value": r["revenue"], "z_score": round(z, 2), "direction": "spike" if z > 0 else "drop"})
+
+        summary_parts = []
+        summary_parts.append(f"Total revenue is ${metrics['total_revenue']:,.0f} across {metrics['total_orders']:,} orders with an average order value of ${metrics['avg_order_value']:,.2f}.")
+        summary_parts.append(f"There are {metrics['active_customers']:,} unique customers.")
+        if trends.get("category_revenue"):
+            top_cat = trends["category_revenue"][0]
+            summary_parts.append(f"The top category is '{top_cat['category']}' at ${top_cat['revenue']:,.2f}.")
+        if anomalies:
+            summary_parts.append(f"{len(anomalies)} anomaly/ies detected in monthly revenue trends.")
+        summary = " ".join(summary_parts)
+
+        recommendations = []
+        cur.execute("SELECT COUNT(*) FROM inventory WHERE stock_quantity < 50")
+        low_stock = cur.fetchone()["count"]
+        if low_stock > 0:
+            recommendations.append(f"Restock {low_stock} products with inventory below 50 units.")
+        if anomalies:
+            recommendations.append("Investigate anomalous revenue months for root cause.")
+        recommendations.append("Run a deeper customer segmentation analysis to identify high-value segments.")
+
+        conn.close()
+
+        return {"metrics": metrics, "trends": trends, "anomalies": anomalies, "summary": summary, "recommendations": recommendations}
+    except ImportError:
+        return {"error": "PostgreSQL driver (psycopg2) not installed. Install with: pip install psycopg2-binary"}
     except Exception as e:
         return {"error": str(e)}
 

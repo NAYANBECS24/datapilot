@@ -1,0 +1,277 @@
+import os
+import json
+import time
+from typing import Any, Dict, List, Optional
+
+DB_TYPES = {}
+
+try:
+    import sqlite3
+    DB_TYPES["sqlite"] = "sqlite3"
+except ImportError:
+    pass
+
+try:
+    import psycopg2
+    import psycopg2.extras
+    DB_TYPES["postgresql"] = "psycopg2"
+except ImportError:
+    pass
+
+try:
+    import pymysql
+    DB_TYPES["mysql"] = "pymysql"
+except ImportError:
+    pass
+
+DEFAULT_ROW_LIMIT = 200
+BLOCKED_KEYWORDS = (
+    "insert", "update", "delete", "drop", "alter", "create",
+    "attach", "detach", "pragma", "vacuum", "replace",
+)
+
+
+def validate_query(sql: str) -> Dict[str, Any]:
+    cleaned = sql.strip().rstrip(";")
+    lowered = cleaned.lower()
+
+    if not lowered.startswith("select") and not lowered.startswith("with"):
+        return {"valid": False, "reason": "Only read-only SELECT/WITH queries are permitted.", "sql": cleaned}
+
+    for kw in BLOCKED_KEYWORDS:
+        import re
+        if re.search(rf"\b{kw}\b", lowered):
+            return {
+                "valid": False,
+                "reason": f"Query contains a blocked keyword: '{kw}'. Only read-only queries are allowed.",
+                "sql": cleaned,
+            }
+
+    if "limit" not in lowered:
+        cleaned = f"{cleaned} LIMIT {DEFAULT_ROW_LIMIT}"
+
+    return {"valid": True, "reason": None, "sql": cleaned}
+
+
+def parse_connection_string(conn_str: str) -> Dict[str, Any]:
+    if not conn_str or conn_str.lower().startswith("sqlite"):
+        db_path = conn_str.split("://", 1)[-1] if "://" in conn_str else conn_str
+        if not db_path:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "sample_ecommerce.db")
+        return {"type": "sqlite", "database": db_path}
+
+    if conn_str.startswith("postgresql://") or conn_str.startswith("postgres://"):
+        parts = conn_str.split("://", 1)[1].split("@")
+        user_pass, host_part = parts[0], parts[1] if len(parts) > 1 else ""
+        user, password = user_pass.split(":", 1) if ":" in user_pass else (user_pass, "")
+        host_db = host_part.split("/", 1)
+        host_port = host_db[0].split(":")
+        host = host_port[0]
+        port = int(host_port[1]) if len(host_port) > 1 else 5432
+        database = host_db[1] if len(host_db) > 1 else ""
+        return {"type": "postgresql", "host": host, "port": port, "user": user, "password": password, "database": database}
+
+    if conn_str.startswith("mysql://"):
+        parts = conn_str.split("://", 1)[1].split("@")
+        user_pass, host_part = parts[0], parts[1] if len(parts) > 1 else ""
+        user, password = user_pass.split(":", 1) if ":" in user_pass else (user_pass, "")
+        host_db = host_part.split("/", 1)
+        host_port = host_db[0].split(":")
+        host = host_port[0]
+        port = int(host_port[1]) if len(host_port) > 1 else 3306
+        database = host_db[1] if len(host_db) > 1 else ""
+        return {"type": "mysql", "host": host, "port": port, "user": user, "password": password, "database": database}
+
+    return {"type": "sqlite", "database": conn_str}
+
+
+class DatabaseManager:
+    def __init__(self, conn_str: str = ""):
+        self.params = parse_connection_string(conn_str) if conn_str else {"type": "sqlite", "database": ""}
+        self.db_type = self.params["type"]
+
+    def get_schema(self) -> Dict[str, Any]:
+        if self.db_type == "sqlite":
+            return self._sqlite_schema()
+        elif self.db_type == "postgresql":
+            return self._postgresql_schema()
+        elif self.db_type == "mysql":
+            return self._mysql_schema()
+        return {"success": False, "error": f"Unsupported database type: {self.db_type}"}
+
+    def execute_query(self, sql: str) -> Dict[str, Any]:
+        check = validate_query(sql)
+        if not check["valid"]:
+            return {"success": False, "sql": sql, "error": check["reason"]}
+
+        safe_sql = check["sql"]
+        start = time.perf_counter()
+
+        try:
+            if self.db_type == "sqlite":
+                return self._sqlite_execute(safe_sql, start)
+            elif self.db_type == "postgresql":
+                return self._postgresql_execute(safe_sql, start)
+            elif self.db_type == "mysql":
+                return self._mysql_execute(safe_sql, start)
+            return {"success": False, "sql": safe_sql, "error": f"Unsupported database type: {self.db_type}"}
+        except Exception as e:
+            return {"success": False, "sql": safe_sql, "error": str(e)}
+
+    def _sqlite_schema(self) -> Dict[str, Any]:
+        try:
+            conn = sqlite3.connect(self.params["database"])
+            cur = conn.cursor()
+
+            tables = [
+                row[0] for row in cur.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+
+            schema: Dict[str, Any] = {"tables": {}, "relationships": []}
+
+            for table in tables:
+                columns = []
+                for col in cur.execute(f"PRAGMA table_info('{table}')").fetchall():
+                    columns.append({"name": col[1], "type": col[2], "primary_key": bool(col[5])})
+
+                fk_list = []
+                for fk in cur.execute(f"PRAGMA foreign_key_list('{table}')").fetchall():
+                    fk_list.append({"column": fk[3], "references_table": fk[2], "references_column": fk[4]})
+                    schema["relationships"].append({"from_table": table, "to_table": fk[2], "via": fk[3]})
+
+                schema["tables"][table] = {"columns": columns, "foreign_keys": fk_list}
+
+            conn.close()
+            return {"success": True, "schema": schema}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _sqlite_execute(self, sql: str, start: float) -> Dict[str, Any]:
+        conn = sqlite3.connect(self.params["database"])
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        columns = [d[0] for d in cur.description] if cur.description else []
+        conn.close()
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "success": True, "sql": sql, "columns": columns,
+            "rows": [dict(r) for r in rows], "row_count": len(rows), "latency_ms": latency_ms,
+        }
+
+    def _postgresql_schema(self) -> Dict[str, Any]:
+        conn = psycopg2.connect(**{k: v for k, v in self.params.items() if k != "type"})
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cur.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' ORDER BY table_name
+        """)
+        tables = [r["table_name"] for r in cur.fetchall()]
+
+        schema: Dict[str, Any] = {"tables": {}, "relationships": []}
+
+        for table in tables:
+            cur.execute("""
+                SELECT column_name, data_type, is_nullable,
+                    (SELECT COUNT(*) FROM information_schema.table_constraints tc
+                     JOIN information_schema.key_column_usage kcu
+                     ON tc.constraint_name = kcu.constraint_name
+                     WHERE tc.table_name = %s AND kcu.column_name = c.column_name
+                     AND tc.constraint_type = 'PRIMARY KEY') > 0 as pk
+                FROM information_schema.columns c
+                WHERE table_name = %s
+            """, (table, table))
+            columns = [{"name": r["column_name"], "type": r["data_type"], "primary_key": r["pk"]} for r in cur.fetchall()]
+
+            cur.execute("""
+                SELECT kcu.column_name, ccu.table_name AS foreign_table_name,
+                       ccu.column_name AS foreign_column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+                WHERE tc.table_name = %s AND tc.constraint_type = 'FOREIGN KEY'
+            """, (table,))
+            for r in cur.fetchall():
+                schema["relationships"].append({
+                    "from_table": table, "to_table": r["foreign_table_name"], "via": r["column_name"]
+                })
+
+            schema["tables"][table] = {"columns": columns, "foreign_keys": []}
+
+        conn.close()
+        return {"success": True, "schema": schema}
+
+    def _postgresql_execute(self, sql: str, start: float) -> Dict[str, Any]:
+        conn = psycopg2.connect(**{k: v for k, v in self.params.items() if k != "type"})
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql)
+        rows = cur.fetchall()
+        columns = list(rows[0].keys()) if rows else []
+        conn.close()
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "success": True, "sql": sql, "columns": columns,
+            "rows": [dict(r) for r in rows], "row_count": len(rows), "latency_ms": latency_ms,
+        }
+
+    def _mysql_schema(self) -> Dict[str, Any]:
+        conn = pymysql.connect(**{k: v for k, v in self.params.items() if k != "type"})
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+
+        cur.execute("SHOW TABLES")
+        tables = [list(r.values())[0] for r in cur.fetchall()]
+
+        schema: Dict[str, Any] = {"tables": {}, "relationships": []}
+
+        for table in tables:
+            cur.execute(f"SHOW COLUMNS FROM `{table}`")
+            columns_data = cur.fetchall()
+            columns = []
+            for c in columns_data:
+                col_name = c["Field"]
+                col_type = c["Type"]
+                is_pk = c["Key"] == "PRI"
+                columns.append({"name": col_name, "type": col_type, "primary_key": is_pk})
+
+            cur.execute(f"SHOW CREATE TABLE `{table}`")
+            create_stmt = cur.fetchone()
+            if create_stmt:
+                import re
+                fk_matches = re.findall(
+                    r"FOREIGN KEY\s*\(`?(\w+)`?\)\s*REFERENCES\s+`?(\w+)`?\s*\(`?(\w+)`?\)",
+                    create_stmt[list(create_stmt.keys())[-1]], re.IGNORECASE
+                )
+                for fk_col, ref_table, ref_col in fk_matches:
+                    schema["relationships"].append({
+                        "from_table": table, "to_table": ref_table, "via": fk_col
+                    })
+
+            schema["tables"][table] = {"columns": columns, "foreign_keys": []}
+
+        conn.close()
+        return {"success": True, "schema": schema}
+
+    def _mysql_execute(self, sql: str, start: float) -> Dict[str, Any]:
+        conn = pymysql.connect(**{k: v for k, v in self.params.items() if k != "type"})
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+        cur.execute(sql)
+        rows = cur.fetchall()
+        columns = list(rows[0].keys()) if rows else []
+        conn.close()
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "success": True, "sql": sql, "columns": columns,
+            "rows": [dict(r) for r in rows], "row_count": len(rows), "latency_ms": latency_ms,
+        }
+
+
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "sample_ecommerce.db")
+DEFAULT_CONN_STRING = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
+
+
+def get_db_manager(conn_str: Optional[str] = None) -> DatabaseManager:
+    return DatabaseManager(conn_str or DEFAULT_CONN_STRING)

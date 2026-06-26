@@ -177,12 +177,70 @@ python tools/insight_tool.py   # runs anomaly detection on sample data
 
 | Layer | Choice | Why |
 |---|---|---|
-| LLM | NVIDIA Llama 3.1 70B | Free API key, OpenAI-compatible endpoint |
+| LLM | NVIDIA / OpenAI / Anthropic | Multiple providers supported via `LLM_PROVIDER` env var |
 | Frontend | Streamlit | Fastest chat UI with chart support |
 | Charts | Plotly | Interactive, zoom, hover, export |
 | Diagrams | Mermaid.js | ER diagrams, flowcharts, SVG output |
-| Database | SQLite | Zero-setup, portable |
+| Database | SQLite + PostgreSQL + MySQL | Multi-DB support via connection string |
 | Deployment | Docker + Streamlit Cloud | Reproducible + free hosting |
+
+---
+
+## Deployment
+
+### Streamlit Community Cloud (free)
+
+1. Push this repo to GitHub
+2. Go to [streamlit.io/cloud](https://streamlit.io/cloud)
+3. Click **New app** → select your repo → set main file to `app.py`
+4. Under **Advanced settings → Secrets**, paste:
+
+```toml
+OPENAI_API_KEY = "nvapi-..."    # or your preferred provider key
+```
+
+5. Deploy — your app will be live at `https://<name>.streamlit.app` in ~2 minutes
+
+### Docker
+
+```bash
+docker compose up --build
+# visit http://localhost:8501
+```
+
+---
+
+## Multi-Database Support
+
+DataPilot can connect to SQLite, PostgreSQL, or MySQL simultaneously:
+
+- **SQLite** (default): `sqlite:///path/to/database.db`
+- **PostgreSQL**: `postgresql://user:password@host:5432/dbname`
+- **MySQL**: `mysql://user:password@host:3306/dbname`
+
+Set via `DATABASE_URL` in `.env` or the **Settings → Database Connection** field in the UI.
+
+Install optional drivers:
+```bash
+pip install datapilot[postgres]   # PostgreSQL support
+pip install datapilot[mysql]      # MySQL support
+```
+
+---
+
+## Voice Input
+
+Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak your query — the browser's built-in Speech Recognition will transcribe and submit it automatically. Works in Chrome, Edge, and Safari.
+
+---
+
+## LLM Providers
+
+| Provider | Env Variable | Default Model |
+|---|---|---|
+| NVIDIA (free) | `OPENAI_API_KEY=nvapi-...` | `meta/llama-3.1-70b-instruct` |
+| OpenAI | `OPENAI_API_KEY=sk-...` + `LLM_PROVIDER=openai` | `gpt-4o-mini` |
+| Anthropic | `ANTHROPIC_API_KEY=sk-ant-...` + `LLM_PROVIDER=anthropic` | `claude-3-5-haiku-latest` |
 
 ---
 

@@ -10,11 +10,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from agent import LANGUAGES, run_agent_turn
+from agent import LANGUAGES, run_agent_turn, get_llm_status
 from trace.tracer import AgentTracer
 from tools.insight_tool import detect_anomalies, generate_auto_insights
 from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads
 from tools.schema_tool import get_schema
+from tools.db_manager import DatabaseManager, validate_query
 
 st.set_page_config(
     page_title="DataPilot · Conversational BI Agent",
@@ -33,6 +34,8 @@ _DEFAULT = {
     "show_sql": True,
     "language": "en",
     "auto_insights": None,
+    "db_conn_str": os.getenv("DATABASE_URL", ""),
+    "voice_mode": False,
 }
 for k, v in _DEFAULT.items():
     if k not in st.session_state:
@@ -457,9 +460,17 @@ SCHEMA_CACHE = None
 def _get_schema():
     global SCHEMA_CACHE
     if SCHEMA_CACHE is None:
-        p = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-        SCHEMA_CACHE = get_schema(p)
+        conn_str = st.session_state.get("db_conn_str", "")
+        if conn_str:
+            SCHEMA_CACHE = get_schema(conn_str=conn_str)
+        else:
+            p = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
+            SCHEMA_CACHE = get_schema(p)
     return SCHEMA_CACHE
+
+def _invalidate_schema_cache():
+    global SCHEMA_CACHE
+    SCHEMA_CACHE = None
 
 def _stats():
     s = _get_schema()
@@ -498,11 +509,11 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    online = bool(os.getenv("OPENAI_API_KEY"))
+    llm_status = get_llm_status()
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:4px 0 10px;color:{_text2};">'
-        f'<span class="status-dot {"online" if online else "offline"}"></span>'
-        f'{"Ready · " + os.getenv("NVIDIA_MODEL", "llama-3.1-70b") if online else "Add API key in .env"}'
+        f'<span class="status-dot {"online" if llm_status["connected"] else "offline"}"></span>'
+        f'{"Ready · " + llm_status["display"] if llm_status["connected"] else "Add API key in .env"}'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -543,7 +554,7 @@ with st.sidebar:
             st.caption("Ask a question to see the agent work.")
 
     with st.expander("⚙️ Settings", expanded=False):
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         with c1:
             if st.button("🌙 Dark" if not st.session_state.dark_mode else "☀️ Light", use_container_width=True):
                 st.session_state.dark_mode = not st.session_state.dark_mode
@@ -552,6 +563,10 @@ with st.sidebar:
             lbl = "🔍 SQL ON" if st.session_state.show_sql else "🔍 SQL OFF"
             if st.button(lbl, use_container_width=True):
                 st.session_state.show_sql = not st.session_state.show_sql
+        with c3:
+            lbl2 = "🎤 Voice ON" if st.session_state.voice_mode else "🎤 Voice OFF"
+            if st.button(lbl2, use_container_width=True):
+                st.session_state.voice_mode = not st.session_state.voice_mode
 
         selected_lang = st.selectbox(
             "Language",
@@ -563,6 +578,26 @@ with st.sidebar:
         if selected_lang != st.session_state.language:
             st.session_state.language = selected_lang
             st.rerun()
+
+        st.caption("Database Connection")
+        db_url = st.text_input(
+            "Connection string",
+            value=st.session_state.db_conn_str or "sqlite:///db/sample_ecommerce.db",
+            label_visibility="collapsed",
+            placeholder="sqlite:///path/to/db or postgresql://user:pass@host/db",
+        )
+        if db_url != st.session_state.db_conn_str:
+            st.session_state.db_conn_str = db_url
+            st.session_state.auto_insights = None
+            _invalidate_schema_cache()
+            st.toast("Database connection updated")
+
+        db_type = "SQLite"
+        if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
+            db_type = "PostgreSQL"
+        elif db_url.startswith("mysql://"):
+            db_type = "MySQL"
+        st.markdown(f'<span style="font-size:10px;color:{_text2};">Connected: {db_type}</span>', unsafe_allow_html=True)
 
     with st.expander("📁 Upload CSV", expanded=False):
         uploaded = st.file_uploader("Choose CSV", type=["csv"], label_visibility="collapsed")
@@ -786,9 +821,73 @@ with tab_chat:
                             st.session_state._recall = SUGGESTION_CHIPS[idx]
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # ── VOICE INPUT ──
+    voice_prompt = None
+    if st.session_state.voice_mode:
+        voice_html = """
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:rgba(0,212,170,0.06);border-radius:12px;border:1px solid rgba(0,212,170,0.15);">
+            <span id="voice-status" style="font-size:13px;color:#7a7d91;">🎤 Click to speak...</span>
+            <button id="voice-btn" onclick="startVoice()" style="background:rgba(0,212,170,0.12);border:1px solid rgba(0,212,170,0.2);color:#00d4aa;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:500;">Start</button>
+        </div>
+        <script>
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            document.getElementById('voice-status').innerText = '❌ Speech not supported in this browser';
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = false;
+            let listening = false;
+
+            window.startVoice = function() {
+                if (listening) return;
+                listening = true;
+                document.getElementById('voice-btn').innerText = 'Listening...';
+                document.getElementById('voice-status').innerText = '🎤 Speak now...';
+                recognition.start();
+            };
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('voice-status').innerText = '✅ \"' + transcript + '\"';
+                document.getElementById('voice-btn').innerText = 'Done';
+                const input = window.parent.document.querySelector('textarea[data-testid="stChatInput"]');
+                if (input) {
+                    input.value = transcript;
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(input, transcript);
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    const form = input.closest('form');
+                    if (form) {
+                        setTimeout(() => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })), 300);
+                    }
+                }
+                listening = false;
+            };
+
+            recognition.onerror = function(event) {
+                document.getElementById('voice-status').innerText = '❌ Error: ' + event.error;
+                document.getElementById('voice-btn').innerText = 'Retry';
+                listening = false;
+            };
+
+            recognition.onend = function() {
+                if (listening) {
+                    document.getElementById('voice-status').innerText = '🎤 Click to speak...';
+                    document.getElementById('voice-btn').innerText = 'Start';
+                    listening = false;
+                }
+            };
+        }
+        </script>
+        """
+        with st.container():
+            st.html(voice_html)
+
     # ── CHAT INPUT ──
     recall = st.session_state.pop("_recall", None)
-    prompt = recall or st.chat_input(
+    prompt = recall or (voice_prompt) or st.chat_input(
         "Ask a question about your data...",
     )
 
@@ -919,8 +1018,9 @@ with tab_profiler:
     )
     st.caption("Select a table to inspect its schema, stats, and sample data.")
 
+    conn_str = st.session_state.get("db_conn_str", "")
     db_path = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-    sr = get_schema(db_path)
+    sr = get_schema(db_path, conn_str=conn_str)
 
     if sr.get("success"):
         tables = list(sr["schema"]["tables"].keys())
@@ -928,7 +1028,7 @@ with tab_profiler:
 
         if selected:
             with st.spinner(f"Profiling `{selected}`..."):
-                r = execute_query(db_path, f"SELECT * FROM {selected} LIMIT 1000")
+                r = execute_query(db_path, f"SELECT * FROM {selected} LIMIT 1000", conn_str=conn_str)
                 if r.get("success"):
                     rows, cols = r["rows"], r["columns"]
                     df = pd.DataFrame(rows, columns=cols)
@@ -981,8 +1081,9 @@ with tab_insights:
 
     if st.button("🔄 Generate Report", use_container_width=True, type="primary"):
         with st.spinner("Running analysis..."):
+            conn_str = st.session_state.get("db_conn_str", "")
             db_path = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-            st.session_state.auto_insights = generate_auto_insights(db_path)
+            st.session_state.auto_insights = generate_auto_insights(db_path, conn_str=conn_str)
 
     if st.session_state.auto_insights:
         rpt = st.session_state.auto_insights
