@@ -464,10 +464,31 @@ def _word_stream(text: str):
         time.sleep(0.015)
 
 
+def _get_font_path() -> str:
+    paths = [
+        "C:/Windows/Fonts/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/DejaVuSans.ttf",
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    cache_dir = os.path.join(os.path.dirname(__file__), ".fonts")
+    os.makedirs(cache_dir, exist_ok=True)
+    cached = os.path.join(cache_dir, "DejaVuSans.ttf")
+    if not os.path.exists(cached):
+        import urllib.request
+        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+        urllib.request.urlretrieve(url, cached)
+    return cached
+
+
 def _generate_pdf_report(messages: list) -> bytes:
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font("DejaVu", "", "C:/Windows/Fonts/DejaVuSans.ttf", uni=True)
+    font_path = _get_font_path()
+    pdf.add_font("DejaVu", "", font_path, uni=True)
     pdf.set_font("DejaVu", "", 16)
     pdf.set_text_color(0, 212, 170)
     pdf.cell(0, 12, "DataPilot - Conversation Report", new_x="LMARGIN", new_y="NEXT")
@@ -554,7 +575,7 @@ with st.sidebar:
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:4px 0 10px;color:{_text2};">'
         f'<span class="status-dot {"online" if llm_status["connected"] else "offline"}"></span>'
-        f'{"Ready · " + llm_status["display"] if llm_status["connected"] else "Add API key in .env"}'
+        f'{"Ready · " + llm_status["display"] if llm_status["connected"] else "API key needed"}'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -608,6 +629,20 @@ with st.sidebar:
             lbl2 = "🎤 Voice ON" if st.session_state.voice_mode else "🎤 Voice OFF"
             if st.button(lbl2, use_container_width=True):
                 st.session_state.voice_mode = not st.session_state.voice_mode
+
+        if not llm_status["connected"]:
+            st.caption("LLM API Key")
+            api_key = st.text_input(
+                "NVIDIA API Key",
+                type="password",
+                placeholder="nvapi-...",
+                label_visibility="collapsed",
+                key="api_key_input",
+            )
+            if api_key:
+                os.environ["OPENAI_API_KEY"] = api_key
+                st.success("Key set! Ask a question below.")
+                st.rerun()
 
         selected_lang = st.selectbox(
             "Language",

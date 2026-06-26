@@ -20,20 +20,21 @@ DB_CONN_STRING = os.getenv("DATABASE_URL", "")
 MAX_SQL_RETRIES = 3
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia").lower()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
-# Fallback: check Streamlit Cloud secrets if env vars not set
-if not OPENAI_API_KEY and not ANTHROPIC_API_KEY:
+
+def _resolve_api_key() -> str:
+    key = os.getenv("OPENAI_API_KEY", "")
+    if key:
+        return key
     try:
         import streamlit as st
-        secrets = st.secrets
-        if not OPENAI_API_KEY:
-            OPENAI_API_KEY = secrets.get("OPENAI_API_KEY", "")
-        if not ANTHROPIC_API_KEY:
-            ANTHROPIC_API_KEY = secrets.get("ANTHROPIC_API_KEY", "")
+        return st.secrets.get("OPENAI_API_KEY", "")
     except Exception:
-        pass
+        return ""
+
+
+OPENAI_API_KEY = _resolve_api_key()
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
@@ -46,27 +47,48 @@ LLM_DISPLAY_NAMES = {
 }
 
 
+def _resolve_key() -> str:
+    key = os.environ.get("OPENAI_API_KEY", "")
+    if key:
+        return key
+    try:
+        import streamlit as st
+        return st.secrets.get("OPENAI_API_KEY", "")
+    except Exception:
+        return ""
+
+
 def _get_llm_client():
+    openai_key = _resolve_key()
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    if not openai_key and not anthropic_key:
+        try:
+            import streamlit as st
+            anthropic_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        except Exception:
+            pass
+
     if LLM_PROVIDER == "openai":
-        if not OPENAI_API_KEY:
+        if not openai_key:
             raise RuntimeError("OPENAI_API_KEY not set for OpenAI provider.")
         from openai import OpenAI
-        return OpenAI(api_key=OPENAI_API_KEY)
+        return OpenAI(api_key=openai_key)
 
     elif LLM_PROVIDER == "anthropic":
-        if not ANTHROPIC_API_KEY:
+        if not anthropic_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set for Anthropic provider.")
         from anthropic import Anthropic
-        return Anthropic(api_key=ANTHROPIC_API_KEY)
+        return Anthropic(api_key=anthropic_key)
 
     else:
-        if not OPENAI_API_KEY:
+        if not openai_key:
             raise RuntimeError(
                 "OPENAI_API_KEY not set. Get a free NVIDIA API key at https://build.nvidia.com, "
                 "then add it to .env (local) or Streamlit Cloud dashboard → Advanced Settings → Secrets."
             )
         from openai import OpenAI
-        return OpenAI(api_key=OPENAI_API_KEY, base_url=NVIDIA_BASE_URL)
+        return OpenAI(api_key=openai_key, base_url=NVIDIA_BASE_URL)
 
 
 def _call_llm(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
