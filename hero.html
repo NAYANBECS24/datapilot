@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CINEMATIC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .bg-video {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .blur-overlay {
+      position: fixed;
+      inset: 0;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      mask-image: linear-gradient(to top, black 0%, transparent 45%);
+      -webkit-mask-image: linear-gradient(to top, black 0%, transparent 45%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .liquid-glass {
+      background: rgba(255, 255, 255, 0.01);
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: none;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .liquid-glass::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    @keyframes blurFadeUp {
+      from { opacity: 0; filter: blur(20px); transform: translateY(40px); }
+      to   { opacity: 1; filter: blur(0); transform: translateY(0); }
+    }
+
+    .animate-blur-fade-up {
+      opacity: 0;
+      animation: blurFadeUp 1s ease-out forwards;
+    }
+
+    .mobile-menu-enter {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mobile-menu-exit {
+      transform: translateY(-16px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(-16px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .animate-slide-right {
+      animation: slideInRight 0.5s ease-out forwards;
+      opacity: 0;
+    }
+
+    .hamburger-inner {
+      transition: transform 0.5s ease-out, opacity 0.5s ease-out, scale 0.5s ease-out;
+    }
+    .hamburger-open .hamburger-inner {
+      transform: rotate(180deg);
+      opacity: 0;
+      scale: 0.5;
+    }
+    .hamburger-open .hamburger-inner-x {
+      transform: rotate(0deg);
+      opacity: 1;
+      scale: 1;
+    }
+    .hamburger-closed .hamburger-inner {
+      transform: rotate(0deg);
+      opacity: 1;
+      scale: 1;
+    }
+    .hamburger-closed .hamburger-inner-x {
+      transform: rotate(-180deg);
+      opacity: 0;
+      scale: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // ── Inline Lucide icons (no external dependency) ──
+
+    const SearchIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+    );
+    const UserIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+    );
+    const MenuIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>
+      </svg>
+    );
+    const XIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    );
+    const StarIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill={props.fill||"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+    );
+    const ClockIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+    );
+    const CalendarIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+      </svg>
+    );
+    const PlayIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill={props.fill||"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <polygon points="6 3 20 12 6 21 6 3"/>
+      </svg>
+    );
+    const ChevronLeftIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+    );
+    const ChevronRightIcon = (props) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+    );
+
+    // ── Components ──
+
+    const NAV_LINKS = ["Movies", "TV Series", "Editor's Pick", "Interviews", "User Reviews"];
+
+    function App() {
+      const [menuOpen, setMenuOpen] = React.useState(false);
+
+      return (
+        <div className="relative w-full h-screen overflow-hidden bg-black" style={{ fontFamily: "'Inter', sans-serif" }}>
+          {/* Background video */}
+          <video className="bg-video" autoPlay muted loop playsInline>
+            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260406_094145_4a271a6c-3869-4f1c-8aa7-aeb0cb227994.mp4" type="video/mp4" />
+          </video>
+
+          {/* Blur overlay */}
+          <div className="blur-overlay" />
+
+          {/* Navbar */}
+          <nav className="relative z-50 flex items-center justify-between px-4 sm:px-6 md:px-12 py-4 md:py-6">
+            {/* Logo */}
+            <div className="h-8 md:h-10 flex items-center animate-blur-fade-up" style={{ animationDelay: '0ms' }}>
+              <span className="text-white text-xl sm:text-2xl md:text-3xl font-light tracking-[0.2em]">CINEMATIC</span>
+            </div>
+
+            {/* Desktop nav links */}
+            <div className="hidden lg:flex items-center gap-8">
+              {NAV_LINKS.map((link, i) => (
+                <a key={link} href="#" className="text-sm text-white/80 hover:text-gray-300 transition-colors duration-300 animate-blur-fade-up" style={{ animationDelay: `${100 + i * 50}ms` }}>
+                  {link}
+                </a>
+              ))}
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              <button className="hidden sm:inline-flex items-center gap-2 rounded-full liquid-glass px-4 md:px-6 py-2 text-sm animate-blur-fade-up" style={{ animationDelay: '350ms' }}>
+                <SearchIcon size={18} />
+                <span className="hidden sm:inline">Search</span>
+              </button>
+
+              <button className="hidden sm:flex w-10 h-10 rounded-full liquid-glass items-center justify-center animate-blur-fade-up" style={{ animationDelay: '400ms' }}>
+                <UserIcon size={18} />
+              </button>
+
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={`lg:hidden w-10 h-10 rounded-full liquid-glass flex items-center justify-center animate-blur-fade-up ${menuOpen ? 'hamburger-open' : 'hamburger-closed'}`}
+                style={{ animationDelay: '350ms' }}
+              >
+                <div className="relative w-5 h-5 flex items-center justify-center">
+                  <MenuIcon size={18} className="hamburger-inner absolute" />
+                  <XIcon size={18} className="hamburger-inner-x absolute" />
+                </div>
+              </button>
+            </div>
+          </nav>
+
+          {/* Mobile menu */}
+          <div className={`absolute top-[72px] left-0 right-0 z-40 transition-all duration-500 ease-out ${menuOpen ? 'mobile-menu-enter' : 'mobile-menu-exit'}`}>
+            <div className="bg-gray-900/95 backdrop-blur-lg border-t border-b border-gray-800 shadow-2xl px-4 sm:px-6 md:px-12 py-6">
+              <div className="flex flex-col gap-1">
+                {NAV_LINKS.map((link, i) => (
+                  <a key={link} href="#" className="py-3 px-3 rounded-lg text-white/80 hover:bg-gray-800/50 transition-all duration-300 animate-slide-right" style={{ animationDelay: `${i * 50}ms` }}>
+                    {link}
+                  </a>
+                ))}
+              </div>
+              <div className="sm:hidden border-t border-gray-800 mt-4 pt-4 flex gap-3">
+                <button className="flex-1 flex items-center justify-center gap-2 rounded-full liquid-glass px-4 py-2.5 text-sm">
+                  <SearchIcon size={18} />
+                  Search
+                </button>
+                <button className="w-12 h-12 rounded-full liquid-glass flex items-center justify-center">
+                  <UserIcon size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero content */}
+          <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 sm:px-6 md:px-12 pb-8 md:pb-16 pointer-events-none">
+            <div className="flex flex-col md:flex-row items-end gap-8 pointer-events-auto">
+              {/* Left */}
+              <div className="flex-1 w-full">
+                {/* Metadata */}
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 mb-6 md:mb-8 text-xs sm:text-sm text-white/90 animate-blur-fade-up" style={{ animationDelay: '300ms' }}>
+                  <span className="flex items-center gap-1.5">
+                    <StarIcon size={16} className="sm:w-5 sm:h-5" fill="white" />
+                    <span className="font-medium">8.7/10 IMDB</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <ClockIcon size={16} className="sm:w-5 sm:h-5" />
+                    <span>132 min</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CalendarIcon size={16} className="sm:w-5 sm:h-5" />
+                    <span>April, 2025</span>
+                  </span>
+                </div>
+
+                {/* Title */}
+                <h1 className="text-white text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-[-0.04em] mb-4 md:mb-6 leading-tight animate-blur-fade-up" style={{ animationDelay: '400ms' }}>
+                  Step Through.<br />Work Smarter.
+                </h1>
+
+                {/* Description */}
+                <p className="text-gray-400 text-base sm:text-lg md:text-xl mb-6 md:mb-12 max-w-2xl animate-blur-fade-up" style={{ animationDelay: '500ms' }}>
+                  A voyage through forgotten realms, where past and future intertwine.
+                </p>
+
+                {/* CTA */}
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <button className="inline-flex items-center gap-2 bg-white text-black rounded-full font-medium px-6 sm:px-8 py-2.5 sm:py-3 hover:bg-gray-200 transition-colors duration-300 animate-blur-fade-up" style={{ animationDelay: '600ms' }}>
+                    <PlayIcon size={18} fill="black" />
+                    Watch Now
+                  </button>
+                  <button className="inline-flex items-center gap-2 rounded-full font-medium liquid-glass px-6 sm:px-8 py-2.5 sm:py-3 animate-blur-fade-up" style={{ animationDelay: '700ms' }}>
+                    Learn More
+                  </button>
+                </div>
+              </div>
+
+              {/* Right — navigation arrows */}
+              <div className="flex flex-row md:flex-col items-center gap-3 self-start md:self-end mt-6 md:mt-0">
+                <button className="inline-flex items-center gap-2 rounded-full liquid-glass px-4 sm:px-6 py-2.5 sm:py-3 animate-blur-fade-up" style={{ animationDelay: '800ms' }}>
+                  <ChevronLeftIcon size={18} />
+                  <span className="hidden sm:inline text-sm">Previous</span>
+                </button>
+                <button className="inline-flex items-center gap-2 rounded-full liquid-glass px-4 sm:px-6 py-2.5 sm:py-3 animate-blur-fade-up" style={{ animationDelay: '900ms' }}>
+                  <span className="hidden sm:inline text-sm">Next</span>
+                  <ChevronRightIcon size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

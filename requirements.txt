@@ -1,0 +1,6 @@
+streamlit>=1.40
+plotly>=5.22
+openai>=1.60
+python-dotenv>=1.0
+pandas>=2.2
+kaleido>=0.2.1
