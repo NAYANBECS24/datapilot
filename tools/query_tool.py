@@ -146,6 +146,34 @@ def import_db_file(db_path: str, label: str = "", username: str = "") -> Dict[st
         return {"success": False, "error": str(e)}
 
 
+def drop_table(table_name: str, username: str = "") -> Dict[str, Any]:
+    db_path = _uploads_db(username)
+    if not os.path.exists(db_path):
+        return {"success": False, "error": "No uploads database found."}
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+        conn.commit()
+        conn.close()
+        return {"success": True, "table": table_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def list_uploaded_files(username: str = "") -> Dict[str, Any]:
+    udir = _uploads_dir(username)
+    files = []
+    for f in os.listdir(udir):
+        fp = os.path.join(udir, f)
+        if os.path.isfile(fp):
+            files.append({
+                "name": f,
+                "path": fp,
+                "size_kb": round(os.path.getsize(fp) / 1024, 1),
+            })
+    return {"success": True, "files": files}
+
+
 def clear_uploads(username: str = ""):
     db_path = _uploads_db(username)
     if os.path.exists(db_path):

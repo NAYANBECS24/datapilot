@@ -14,7 +14,7 @@ from fpdf import FPDF
 from agent import LANGUAGES, run_agent_turn, get_llm_status
 from trace.tracer import AgentTracer
 from tools.insight_tool import detect_anomalies, generate_auto_insights
-from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads, import_db_file
+from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads, import_db_file, drop_table, list_uploaded_files, _uploads_dir
 from tools.schema_tool import get_schema
 from tools.db_manager import DatabaseManager, validate_query
 from auth.auth import register, login, get_user
@@ -816,6 +816,7 @@ with st.sidebar:
         st.markdown(f'<span style="font-size:10px;color:{_text2};">Connected: {db_type}</span>', unsafe_allow_html=True)
 
     with st.expander("📁 Upload CSV" + _upload_label, expanded=False):
+        st.caption("Upload a CSV file → becomes a queryable table → ask questions in chat")
         uploaded_csv = st.file_uploader("Choose CSV", type=["csv"], label_visibility="collapsed", key="csv_upload")
         if uploaded_csv:
             tbl = st.text_input("Table name", value=uploaded_csv.name.replace(".csv", "").replace(" ", "_").lower())
@@ -833,6 +834,7 @@ with st.sidebar:
                     st.error(r["error"])
 
     with st.expander("🗄️ Upload SQLite DB" + _upload_label, expanded=False):
+        st.caption("Upload a `.db` / `.sqlite` / `.sqlite3` file → all tables become queryable")
         uploaded_db = st.file_uploader("Choose .db file", type=["db", "sqlite", "sqlite3"], label_visibility="collapsed", key="db_upload")
         if uploaded_db:
             label = st.text_input("Label (optional)", value=uploaded_db.name.replace(".db", "").replace(".sqlite", "").replace(" ", "_").lower())
@@ -849,6 +851,25 @@ with st.sidebar:
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
+
+    with st.popover("📂 My Uploaded Files", help="See and manage uploaded files"):
+        st.caption(f"Files in {_upload_label.strip()}")
+        flist = list_uploaded_files(username=_current_user)
+        if flist.get("success") and flist["files"]:
+            for f in flist["files"]:
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    st.markdown(f"`{f['name']}` ({f['size_kb']} KB)")
+                with c2:
+                    fp = f["path"]
+                    if st.button("🗑️", key=f"sbf_{fp}", help="Delete file"):
+                        try:
+                            os.remove(fp)
+                            st.rerun()
+                        except Exception:
+                            pass
+        else:
+            st.caption("No uploaded files yet.")
 
     if st.button("🗑️ Clear Uploads" + _upload_label, use_container_width=True, type="secondary"):
         clear_uploads(username=_current_user)
@@ -1250,47 +1271,81 @@ with tab_chat:
 
 with tab_data:
     st.markdown(f'<h3 style="color:{_accent};">🗂️ Your Data Sources</h3>', unsafe_allow_html=True)
-    st.caption("All databases and tables available for querying.")
+    st.caption("Browse, query, and manage all your data sources in one place.")
 
-    all_sources = []
+    tab_overview, tab_upload_help = st.tabs(["📋 Overview", "📤 Upload Guide"])
+    with tab_upload_help:
+        st.markdown("""
+        ### Supported Formats
 
-    sample_path = _db_path
-    if os.path.exists(sample_path):
-        try:
-            s = get_schema(db_path=sample_path)
-            if s.get("success"):
-                all_sources.append(("📦 Sample E-Commerce DB", sample_path, s["tables"]))
-        except Exception:
-            pass
+        | Format | How to Upload | How to Query in Chat |
+        |---|---|---|
+        | **CSV** (.csv) | Sidebar → Upload CSV → pick file → name table → Import | "Show me first 10 rows from my.products" |
+        | **SQLite DB** (.db/.sqlite/.sqlite3) | Sidebar → Upload SQLite DB → pick file → optional label → Import | "What tables are in my uploads?" then query any table |
+        | **Excel** (.xlsx) | Convert to CSV first (File → Save As → CSV) or use SQLite DB | Same as CSV above |
+        | **JSON** (.json) | Convert to CSV or SQLite, or use via connection string | Same |
 
-    for label, mode_username in [("👤 My Uploads", st.session_state.user), ("🌐 Shared Uploads", "")]:
-        info = list_uploaded_tables(username=mode_username)
-        if info.get("success") and info["tables"]:
-            from tools.query_tool import _uploads_db as _get_up_db
-            up_path = _get_up_db(mode_username)
-            all_sources.append((label, up_path, info["tables"]))
+        ### Quick Tips
+        - **Personal mode** — only you see your uploads
+        - **Shared mode** — all registered users see these tables
+        - **"Ask from Uploaded File"** toggle → agent focuses only on your data
+        - **Max file size** — Streamlit Cloud limit is ~200MB per upload
+        """)
 
-    if not all_sources:
-        st.info("No databases found. Upload a CSV or SQLite file to get started.")
-    else:
-        for src_name, src_path, tables in all_sources:
-            st.markdown(f'<h4 style="color:{_accent};">{src_name}</h4>', unsafe_allow_html=True)
-            st.code(src_path, language="text")
-            for t in tables:
-                cols_fmt = ", ".join(t["columns"][:5])
-                if len(t["columns"]) > 5:
-                    cols_fmt += f" … +{len(t['columns'])-5} more"
-                c1, c2, c3 = st.columns([3, 1, 1])
-                with c1:
-                    st.markdown(f'**{t["table_name"]}**')
-                with c2:
-                    st.markdown(f'`{t["row_count"]} rows`')
-                with c3:
-                    with st.popover("Columns", help="View columns"):
-                        for col in t["columns"]:
-                            st.code(col)
-                st.markdown(f'<span style="font-size:12px;color:{_text2};">{cols_fmt}</span>', unsafe_allow_html=True)
-                st.divider()
+    with tab_overview:
+        all_sources = []
+
+        sample_path = _db_path
+        if os.path.exists(sample_path):
+            try:
+                s = get_schema(db_path=sample_path)
+                if s.get("success"):
+                    all_sources.append(("📦 Sample E-Commerce DB", sample_path, s["tables"], False))
+            except Exception:
+                pass
+
+        for label, mode_username in [("👤 My Uploads", st.session_state.user), ("🌐 Shared Uploads", "")]:
+            info = list_uploaded_tables(username=mode_username)
+            if info.get("success") and info["tables"]:
+                from tools.query_tool import _uploads_db as _get_up_db
+                up_path = _get_up_db(mode_username)
+                all_sources.append((label, up_path, info["tables"], mode_username != ""))
+
+        if not all_sources:
+            st.info("No databases found. Upload a CSV or SQLite file to get started.")
+        else:
+            for src_name, src_path, tables, can_delete in all_sources:
+                mode_user = st.session_state.user if "My Uploads" in src_name else ""
+                col_title, col_clear = st.columns([3, 1])
+                with col_title:
+                    st.markdown(f'<h4 style="color:{_accent};">{src_name}</h4>', unsafe_allow_html=True)
+                    st.code(src_path, language="text")
+                with col_clear:
+                    if can_delete and st.button(f"🗑️ Clear All", key=f"clear_{mode_user}", use_container_width=True):
+                        clear_uploads(username=mode_user)
+                        st.session_state.auto_insights = None
+                        st.rerun()
+
+                for t in tables:
+                    cols_fmt = ", ".join(t["columns"][:5])
+                    if len(t["columns"]) > 5:
+                        cols_fmt += f" … +{len(t['columns'])-5} more"
+                    c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
+                    with c1:
+                        st.markdown(f'**{t["table_name"]}**')
+                    with c2:
+                        st.markdown(f'`{t["row_count"]} rows`')
+                    with c3:
+                        with st.popover("📋 Columns", help="View columns"):
+                            for col in t["columns"]:
+                                st.code(col)
+                    with c4:
+                        if can_delete:
+                            if st.button("❌", key=f"del_{mode_user}_{t['table_name']}", help="Delete this table"):
+                                drop_table(t["table_name"], username=mode_user)
+                                st.rerun()
+                    st.markdown(f'<span style="font-size:12px;color:{_text2};">{cols_fmt}</span>', unsafe_allow_html=True)
+                    st.divider()
 
 # ══════════════════════════════ DASHBOARD ════════════════════════════════
 
