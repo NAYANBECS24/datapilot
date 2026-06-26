@@ -22,6 +22,18 @@ MAX_SQL_RETRIES = 3
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia").lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+# Fallback: check Streamlit Cloud secrets if env vars not set
+if not OPENAI_API_KEY and not ANTHROPIC_API_KEY:
+    try:
+        import streamlit as st
+        secrets = st.secrets
+        if not OPENAI_API_KEY:
+            OPENAI_API_KEY = secrets.get("OPENAI_API_KEY", "")
+        if not ANTHROPIC_API_KEY:
+            ANTHROPIC_API_KEY = secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        pass
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
@@ -50,7 +62,8 @@ def _get_llm_client():
     else:
         if not OPENAI_API_KEY:
             raise RuntimeError(
-                "OPENAI_API_KEY not set. Copy .env.example -> .env and add your API key."
+                "OPENAI_API_KEY not set. Get a free NVIDIA API key at https://build.nvidia.com, "
+                "then add it to .env (local) or Streamlit Cloud dashboard → Advanced Settings → Secrets."
             )
         from openai import OpenAI
         return OpenAI(api_key=OPENAI_API_KEY, base_url=NVIDIA_BASE_URL)
