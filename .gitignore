@@ -1,6 +1,7 @@
 uploads/*/rag/
 uploads/*/chats/
 uploads/*/uploads.db
+auth/users.db
 __pycache__/
 *.pyc
 .env
