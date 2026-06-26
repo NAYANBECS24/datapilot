@@ -2,6 +2,8 @@
 
 **iTech AI Innovation Hackathon 2026** · *"Building Intelligent LLM Agents for Database Interaction & Visualization"*
 
+**Team — Parth**
+
 Chat in plain English → agent writes & runs SQL → renders charts/diagrams → explains insights. Built with self-healing SQL, real-time streaming, transparent agent traces, glassmorphism UI, and a living pinned dashboard.
 
 ---
@@ -13,26 +15,32 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | Real-time streaming responses | ✅ Word-level animation via `st.write_stream()` |
 | Self-healing SQL retry loop | ✅ Failed queries auto-fix via LLM (3 attempts) |
 | Live Agent Trace sidebar | ✅ Every tool call with latency — proves the agent is really working |
-| Schema-grounded ER diagrams | ✅ Deterministic from real foreign keys — zero hallucinated relationships |
+| Schema-grounded ER diagrams | ✅ Deterministic from real foreign keys |
 | Decision tree diagrams | ✅ Branching decision trees for conditional logic |
 | Process flow diagrams | ✅ Order-to-delivery pipelines |
 | Pin-to-Dashboard builder | ✅ Any chart → pin → persistent BI dashboard |
-| Smart chart recommendation | ✅ Auto-detects time-series, proportions, categories → picks best chart |
+| Smart chart recommendation | ✅ Auto-detects time-series, proportions, categories |
 | 4 chart types | ✅ Bar, line, pie, scatter (bonus) |
 | Glass-box SQL transparency | ✅ Every generated SQL shown in collapsible panel |
-| Export charts as PNG / data as CSV | ✅ One-click download under every chart and dashboard |
+| Export charts as PNG / data as CSV | ✅ One-click download under every chart |
 | PDF report export | ✅ Full conversation exported as PDF |
 | Data Whisperer anomaly scan | ✅ Statistical z-score scan flags outliers |
-| Query history & favorites | ✅ Scrollable history + star to save reusable questions |
+| Query history & favorites | ✅ Scrollable history + star to save |
 | Multi-DB support | ✅ SQLite, PostgreSQL, MySQL, **MongoDB** (bonus) |
-| Voice input | ✅ Browser Speech Recognition (Chrome/Edge/Safari) |
+| Voice input | ✅ Browser Speech Recognition |
 | Read-only SQL guardrail | ✅ Blocks INSERT/UPDATE/DELETE/DROP |
-| Glassmorphism UI | ✅ Premium dark/light glass design with blur, gradients, animations |
+| Glassmorphism UI | ✅ Premium dark/light glass design |
 | Multi-language chat | ✅ English, Hindi, Spanish, French, German |
-| Data Profiler tab | ✅ Column analysis, null counts, uniqueness, stats per table |
-| Auto Insights tab | ✅ One-click revenue/trends/anomalies/recommendations report |
+| Data Profiler tab | ✅ Column analysis, null counts, stats per table |
+| Auto Insights tab | ✅ One-click revenue/trends report |
 | Upload CSV | ✅ Import any CSV as a queryable table |
-| Dashboard HTML export | ✅ Download full dashboard as portable HTML |
+| **Upload SQLite DB** | ✅ Import any `.db` / `.sqlite` file |
+| **Login & Register Portal** | ✅ Multi-user auth with password hashing |
+| **Per-User Data Isolation** | ✅ Each user has private uploads |
+| **Shared Database** | ✅ Team-accessible common upload area |
+| **Ask from Uploaded File Mode** | ✅ Agent focuses only on your uploaded data |
+| **My Data Tab** | ✅ Browse all tables, row counts, columns |
+| Dashboard HTML export | ✅ Download full dashboard as HTML |
 | Collaborative share | ✅ Copy conversation to clipboard |
 | Docker support | ✅ Dockerfile + docker-compose.yml |
 | Unit tests | ✅ 85 tests, all passing |
@@ -42,42 +50,44 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 ## Architecture
 
 ```
-User types a question
+User → Login / Register
        │
        ▼
-┌──────────────────────┐   tool calls    ┌──────────────────────┐
-│   Streamlit UI        │ ◄─────────────  │   Agent (agent.py)   │
-│  (app.py)             │                 │                      │
-│  ┌────────────────┐   │                 │  ┌────────────────┐  │
-│  │ Chat tab       │   │                 │  │ get_schema     │  │
-│  │ Dashboard tab  │   │                 │  │ execute_query  │  │
-│  │ Profiler tab   │   │                 │  │ generate_chart │  │
-│  │ Insights tab   │   │                 │  │ generate_flow..│  │
-│  │ Sidebar: trace │   │                 │  │ explain_data   │  │
-│  │ settings/hist  │   │                 │  └────────────────┘  │
-│  └────────────────┘   │                 │                      │
-└──────────────────────┘                  │  Self-healing        │
-       │                                  │  retry loop          │
-       │ Mermaid diagrams (ER/flow/tree)  │  (max 3 tries)       │
-       │ Plotly charts (interactive)      │  Streaming output    │
-       │ PDF/Markdown/CSV/PNG export      │                      │
-       └──────────────────────────────────┴──────────────────────┘
-                                                    │
-                                                    ▼
-                    ┌──────────────────────────────────────────┐
-                    │  Database Layer                          │
-                    │  SQLite │ PostgreSQL │ MySQL │ MongoDB    │
-                    │  (selectable via connection string)       │
-                    └──────────────────────────────────────────┘
+┌──────────────────────────┐   tool calls    ┌──────────────────────────┐
+│   Streamlit UI (app.py)   │ ◄─────────────  │   Agent (agent.py)       │
+│                           │                 │                          │
+│  ┌────────────────────┐   │                 │  ┌────────────────────┐  │
+│  │ Chat tab           │   │                 │  │ get_schema         │  │
+│  │ My Data tab        │   │                 │  │ execute_query      │  │
+│  │ Dashboard tab      │   │                 │  │ generate_chart     │  │
+│  │ Profiler tab       │   │                 │  │ generate_flowchart  │  │
+│  │ Insights tab       │   │                 │  │ explain_data       │  │
+│  │ Sidebar: trace,    │   │                 │  └────────────────────┘  │
+│  │ upload, modes      │   │                 │                          │
+│  └────────────────────┘   │                 │  Self-healing retry      │
+└──────────────────────────┘                  │  User-aware context      │
+       │                                      │  (personal/shared/file)  │
+       │ Auth: users.db (password hashing)    │                          │
+       │ Uploads: uploads/{user}/ or shared/  └──────────────────────────┘
+       │ Mermaid/Plotly/PDF/CSV export                          │
+       └─────────────────────────────────────────────────────────┘
+                                                                  │
+                                                                  ▼
+                         ┌────────────────────────────────────────────┐
+                         │  Database Layer                            │
+                         │  SQLite (sample) │ Uploads/{user} │ Shared │
+                         │  PostgreSQL │ MySQL │ MongoDB              │
+                         └────────────────────────────────────────────┘
 ```
 
 ### Layer breakdown
-- **Frontend:** `app.py` — Streamlit chat UI with 4 tabs (Chat, Dashboard, Profiler, Auto Insights), sidebar trace panel, dark/light theme, voice input, streaming responses
-- **Orchestration:** `agent.py` — LLM tool-use loop with streaming support, self-healing retry logic, multi-provider support (NVIDIA/OpenAI/Anthropic), trace logging
-- **Tools layer:** 5 pure, independently-testable functions in `tools/*.py` — no LLM calls inside them
-- **Database abstraction:** `tools/db_manager.py` — unified interface for SQLite, PostgreSQL, MySQL, and MongoDB
-- **Data layer:** SQLite with sample e-commerce dataset (customers, products, orders, order_items, inventory, suppliers, reviews, payments, shipping)
-- **Observability:** `trace/tracer.py` — dataclass-based logger, zero external dependencies
+- **Auth:** `auth/auth.py` — password hashing (SHA-256), user registration/login, per-user upload directories
+- **Frontend:** `app.py` — Streamlit with 5 tabs (Chat, My Data, Dashboard, Profiler, Auto Insights), sidebar trace, upload modes, dark/light theme
+- **Orchestration:** `agent.py` — LLM tool-use loop with user-aware context (personal/shared/file mode), self-healing retry, multi-provider
+- **Tools layer:** 5 pure functions in `tools/*.py` — no LLM calls inside them
+- **Database abstraction:** `tools/db_manager.py` — unified interface for SQLite, PostgreSQL, MySQL, MongoDB
+- **Data layer:** SQLite sample e-commerce DB + per-user `uploads/{username}/uploads.db` + shared `uploads/shared/uploads.db`
+- **Observability:** `trace/tracer.py` — dataclass-based logger
 
 ---
 
@@ -134,13 +144,16 @@ docker compose up --build
 datapilot/
 ├── app.py                   Streamlit frontend (chat, dashboard, profiler, insights)
 ├── agent.py                 LLM orchestration with streaming + multi-provider
+├── auth/
+│   ├── __init__.py
+│   └── auth.py              Login/register, password hashing, user management
 ├── .streamlit/
 │   ├── config.toml          Streamlit Cloud server config
 │   └── secrets.toml.example Template for cloud secrets
 ├── tools/
 │   ├── db_manager.py        Multi-DB abstraction (SQLite/PostgreSQL/MySQL/MongoDB)
-│   ├── schema_tool.py       get_schema — table/column/FK discovery
-│   ├── query_tool.py        execute_query + validate_query (read-only guard) + CSV upload
+│   ├── schema_tool.py       get_schema — table/column/FK discovery + upload merging
+│   ├── query_tool.py        execute_query + validate_query + CSV/DB upload + per-user paths
 │   ├── chart_tool.py        generate_chart — bar/line/pie/scatter/auto
 │   ├── flowchart_tool.py    generate_flowchart — ER diagram + process flow + decision tree
 │   └── insight_tool.py      explain_data + detect_anomalies + generate_auto_insights
@@ -148,6 +161,9 @@ datapilot/
 │   ├── seed_db.py           Sample e-commerce SQLite dataset generator
 │   ├── check_db.py          Database validation helper
 │   └── sample_ecommerce.db  Pre-seeded database (12,456 rows, 9 tables)
+├── uploads/                 Per-user and shared upload directories
+│   ├── shared/              Common upload area (all users)
+│   └── {username}/          Private per-user upload area
 ├── trace/
 │   └── tracer.py            Agent observability / trace logging
 ├── tests/
@@ -174,6 +190,55 @@ python tools/flowchart_tool.py   # prints ER + process-flow + decision-tree Merm
 python tools/insight_tool.py     # runs anomaly detection on sample data
 python -m pytest tests/ -v       # 85 tests
 ```
+
+---
+
+## Login & Multi-User Portal
+
+DataPilot starts with a login/register screen. Users must sign up before accessing the app.
+
+- **Registration:** Username (min 3 chars) + password (min 4 chars), stored with SHA-256 hashing
+- **Login:** Authenticates against `auth/users.db`
+- **Session:** Persists per browser session; logout clears all session state
+- **Footer:** Team name displayed on both login and main pages
+
+---
+
+## Per-User Data Isolation
+
+Every user gets their own private upload space:
+
+| Upload Mode | Storage Path | Access |
+|---|---|---|
+| **Personal** | `uploads/{username}/uploads.db` | Only that user |
+| **Shared** | `uploads/shared/uploads.db` | All users |
+
+Toggle between **Personal** and **Shared** mode in the sidebar. The schema tool auto-discovers both:
+- Tables prefixed with `my.` → personal uploads
+- Tables prefixed with `uploads.` → shared uploads
+
+---
+
+## My Data Tab
+
+The **My Data** tab (2nd tab) shows every available data source in one place:
+
+- **Sample E-Commerce DB** — 9 tables, 12,456 rows
+- **My Uploads** — your personal CSV/DB uploads
+- **Shared Uploads** — team-accessible common data
+
+Each table shows: name, row count, column list (expandable via popover), and file path.
+
+---
+
+## Ask from Uploaded File Mode
+
+Toggle **"Ask from Uploaded File"** in the sidebar to switch the agent into file-only mode:
+
+- The agent ignores the sample e-commerce database
+- It only queries tables from your uploaded data (`my.*` or `uploads.*`)
+- Perfect for: *"Upload your Excel → switch mode → ask questions about it"*
+- The system prompt dynamically changes to guide the agent's focus
 
 ---
 
@@ -310,15 +375,16 @@ docker compose up --build
 ## Evaluation Criteria Coverage
 
 | Criteria | Weight | How DataPilot Addresses It |
-|---|---|---|
-| Functionality | 30% | All 5 required tools working, accurate SQL generation, 4 chart types, 3 diagram types, multi-turn conversations |
-| Tool Design & Architecture | 25% | Clean function schemas with typed params, modular tools/agent split, extensible multi-DB abstraction, no LLM calls in tools |
+|---|---|---|---|
+| Functionality | 30% | All 5 required tools, SQL upload/SQLite DB upload, 4 chart types, 3 diagram types, multi-turn convos |
+| Tool Design & Architecture | 25% | Clean schemas, modular tools/agent split, multi-DB, per-user auth isolation, file-mode context |
 | Visualization Quality | 20% | Plotly interactive charts with auto-detection, Mermaid diagrams, glassmorphism dark/light theme |
-| User Experience | 15% | Streaming responses, animated UI, voice input, multi-language, anomaly scanner, dashboard builder |
-| Innovation & Creativity | 10% | Self-healing SQL retry, decision trees, MongoDB support, PDF export, trace sidebar, collaborative share |
+| User Experience | 15% | Login/register portal, My Data tab, streaming, voice, multi-language, anomaly scanner, dashboard |
+| Innovation & Creativity | 10% | Self-healing SQL, decision trees, MongoDB, PDF export, trace sidebar, per-user upload isolation, Ask from File mode |
 
 ---
 
 ## License
 
-MIT — built for the iTech AI Innovation Hackathon 2026.
+MIT — built for the iTech AI Innovation Hackathon 2026.  
+**Team — Parth**
