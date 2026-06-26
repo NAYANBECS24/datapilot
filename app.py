@@ -253,10 +253,19 @@ theme_css = f"""
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 
     * {{ font-family: 'Inter', -apple-system, sans-serif; }}
+    html {{ scroll-behavior: smooth; }}
     .stApp {{ background: {_bg}; color: {_text}; }}
+    .main .block-container {{ padding: 1rem 2rem 8rem !important; max-width: 1160px; animation: pageIn 0.6s ease; }}
 
-    .main .block-container {{ padding: 1rem 2rem 8rem !important; max-width: 1160px; }}
+    /* ── PAGE ENTRY ── */
+    @keyframes pageIn {{ from {{ opacity: 0; transform: translateY(12px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    @keyframes fadeSlide {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    @keyframes float {{ 0%,100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-6px); }} }}
+    @keyframes glowPulse {{ 0%,100% {{ opacity: 0.4; }} 50% {{ opacity: 0.8; }} }}
+    @keyframes scaleIn {{ from {{ opacity: 0; transform: scale(0.95); }} to {{ opacity: 1; transform: scale(1); }} }}
+    @keyframes shimmer {{ 0% {{ background-position: -200% 0; }} 100% {{ background-position: 200% 0; }} }}
 
+    /* ── TOP GRADIENT BAR ── */
     .gradient-bar {{
         position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
         height: 3px;
@@ -264,25 +273,33 @@ theme_css = f"""
         box-shadow: 0 0 24px rgba(0,212,170,0.4);
     }}
 
+    /* ── TYPOGRAPHY ── */
     h1, h2, h3, h4 {{ color: {_text} !important; font-weight: 700 !important; letter-spacing: -0.02em; }}
     h1 {{ font-size: 1.8rem !important; }}
     p, li, .stMarkdown {{ color: {_text} !important; line-height: 1.6; }}
 
+    /* ── GLASS CARD ── */
     .glass {{
         background: {_card_bg};
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         border: 1px solid {_card_border};
         border-radius: 14px;
         padding: 1rem 1.25rem;
         margin-bottom: 0.6rem;
-        transition: all 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }}
-    .glass-hover:hover {{ border-color: rgba(0,212,170,0.15); }}
+    .glass-hover:hover {{
+        border-color: rgba(0,212,170,0.18);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
+    }}
 
+    /* ── BADGES ── */
     .badge {{
         display: inline-flex; align-items: center; gap: 4px;
         padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 600;
+        transition: all 0.2s ease;
     }}
     .badge-green {{ background: rgba(0,212,170,0.12); color: {_accent}; }}
     .badge-purple {{ background: rgba(124,58,237,0.12); color: {_accent2}; }}
@@ -291,14 +308,16 @@ theme_css = f"""
 
     .status-dot {{
         display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-        margin-right: 6px; animation: pulse 2s infinite;
+        margin-right: 6px; animation: glowPulse 2s infinite;
     }}
     .status-dot.online {{ background: {_accent}; box-shadow: 0 0 8px rgba(0,212,170,0.4); }}
     .status-dot.offline {{ background: #6b7280; }}
 
-    ::-webkit-scrollbar {{ width: 5px; }}
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar {{ width: 4px; }}
     ::-webkit-scrollbar-track {{ background: transparent; }}
-    ::-webkit-scrollbar-thumb {{ background: {'rgba(255,255,255,0.08)' if mode == 'dark' else 'rgba(0,0,0,0.08)'}; border-radius: 3px; }}
+    ::-webkit-scrollbar-thumb {{ background: linear-gradient(180deg, rgba(0,212,170,0.15), rgba(124,58,237,0.15)); border-radius: 2px; }}
+    ::-webkit-scrollbar-thumb:hover {{ background: linear-gradient(180deg, rgba(0,212,170,0.3), rgba(124,58,237,0.3)); }}
 
     footer, #MainMenu, header[data-testid="stHeader"], div[data-testid="stDecoration"], div[data-testid="stToolbar"], .st-emotion-cache-1kyxreq {{ display: none !important; }}
 
@@ -306,6 +325,7 @@ theme_css = f"""
     .welcome-hero {{
         text-align: center; padding: 2rem 1rem 1.5rem;
         max-width: 700px; margin: 0 auto;
+        animation: fadeSlide 0.6s ease;
     }}
     .welcome-hero h1 {{
         font-size: 2.4rem !important; font-weight: 800 !important;
@@ -320,7 +340,9 @@ theme_css = f"""
     .welcome-stat {{
         background: {_card_bg}; border: 1px solid {_card_border}; border-radius: 12px;
         padding: 0.5rem 1rem; text-align: center; min-width: 80px;
+        transition: all 0.3s ease;
     }}
+    .welcome-stat:hover {{ border-color: rgba(0,212,170,0.15); transform: translateY(-1px); }}
     .welcome-stat-val {{ font-size: 20px; font-weight: 700; color: {_accent}; }}
     .welcome-stat-lbl {{ font-size: 10px; color: {_text2}; text-transform: uppercase; letter-spacing: 0.05em; }}
 
@@ -331,25 +353,32 @@ theme_css = f"""
     }}
     .welcome-card {{
         background: {_card_bg};
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px);
         border: 1px solid {_card_border};
         border-radius: 14px;
         padding: 1rem 1.1rem;
         cursor: pointer;
-        transition: all 0.25s ease;
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         text-align: left;
+        position: relative; overflow: hidden;
+    }}
+    .welcome-card::after {{
+        content: ''; position: absolute; inset: 0; border-radius: 14px;
+        background: linear-gradient(135deg, rgba(0,212,170,0.04), transparent 60%);
+        opacity: 0; transition: opacity 0.4s ease;
     }}
     .welcome-card:hover {{
         border-color: {_accent};
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(0,212,170,0.08);
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(0,212,170,0.1);
     }}
-    .welcome-card-icon {{ font-size: 24px; margin-bottom: 6px; }}
-    .welcome-card-title {{ font-size: 14px; font-weight: 600; color: {_text}; }}
-    .welcome-card-desc {{ font-size: 12px; color: {_text2}; margin-top: 2px; }}
+    .welcome-card:hover::after {{ opacity: 1; }}
+    .welcome-card-icon {{ font-size: 24px; margin-bottom: 6px; position: relative; z-index: 1; }}
+    .welcome-card-title {{ font-size: 14px; font-weight: 600; color: {_text}; position: relative; z-index: 1; }}
+    .welcome-card-desc {{ font-size: 12px; color: {_text2}; margin-top: 2px; position: relative; z-index: 1; }}
 
     /* ── CHAT MESSAGES ── */
-    .msg-row {{ display: flex; margin-bottom: 0.85rem; animation: fadeIn 0.3s ease; }}
+    .msg-row {{ display: flex; margin-bottom: 0.85rem; animation: fadeSlide 0.35s ease; }}
     .msg-row.user {{ justify-content: flex-end; }}
     .msg-row.assistant {{ justify-content: flex-start; }}
 
@@ -362,24 +391,27 @@ theme_css = f"""
         color: #000; font-weight: 500;
         border-radius: 20px 20px 6px 20px;
         box-shadow: 0 4px 20px rgba(0,212,170,0.25);
+        animation: scaleIn 0.25s ease;
     }}
     .msg-bubble.assistant {{
         background: {_card_bg};
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px);
         border: 1px solid {_card_border};
         border-radius: 20px 20px 20px 6px;
         box-shadow: {_shadow};
+        animation: scaleIn 0.25s ease;
     }}
     .msg-avatar {{
         width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
         background: {_accent_grad};
         display: flex; align-items: center; justify-content: center;
         font-size: 17px; margin-right: 10px; margin-top: 3px;
+        box-shadow: 0 4px 12px rgba(0,212,170,0.15);
     }}
 
     .msg-time {{ font-size: 11px; color: {_text2}; margin-top: 6px; padding-left: 3px; }}
 
-    .content-section {{ margin-top: 0.5rem; }}
+    .content-section {{ margin-top: 0.5rem; animation: fadeSlide 0.3s ease; }}
     .content-label {{
         display: inline-flex; align-items: center; gap: 4px;
         font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
@@ -389,7 +421,7 @@ theme_css = f"""
     .content-label.chart {{ background: rgba(0,212,170,0.1); color: {_accent}; }}
     .content-label.diagram {{ background: rgba(245,158,11,0.1); color: #f59e0b; }}
 
-    /* ── ACTION BAR (under charts) ── */
+    /* ── ACTION BAR ── */
     .action-bar {{
         display: flex; gap: 6px; flex-wrap: wrap;
         padding: 0.5rem 0 0;
@@ -400,15 +432,16 @@ theme_css = f"""
         background: {'rgba(255,255,255,0.04)' if mode == 'dark' else 'rgba(0,0,0,0.03)'};
         border: 1px solid {_card_border}; border-radius: 8px;
         color: {_text2} !important; text-decoration: none !important;
-        cursor: pointer; transition: all 0.2s ease;
+        cursor: pointer; transition: all 0.25s ease;
     }}
     .action-btn:hover {{
         border-color: {_accent}; color: {_accent} !important;
-        background: rgba(0,212,170,0.06);
+        background: rgba(0,212,170,0.08);
+        transform: translateY(-1px);
     }}
     .action-btn.danger:hover {{ border-color: #ef4444; color: #ef4444 !important; }}
 
-    /* ── CHAT INPUT / SUGGESTIONS ── */
+    /* ── CHAT INPUT ── */
     .suggestions-strip {{
         display: flex; flex-wrap: wrap; gap: 6px;
         margin-bottom: 0.5rem; padding: 0 2px;
@@ -419,13 +452,14 @@ theme_css = f"""
         background: {_card_bg};
         border: 1px solid {_card_border}; border-radius: 20px;
         color: {_text2}; cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         white-space: nowrap;
     }}
     .suggestion-pill:hover {{
         border-color: {_accent}; color: {_accent};
-        background: rgba(0,212,170,0.06);
-        transform: translateY(-1px);
+        background: rgba(0,212,170,0.08);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,212,170,0.06);
     }}
 
     .stChatInputContainer {{
@@ -435,14 +469,14 @@ theme_css = f"""
     div[data-testid="stChatInput"] {{
         border: 1px solid {_card_border} !important;
         background: {_input_bg} !important;
-        backdrop-filter: blur(20px);
+        backdrop-filter: blur(24px);
         border-radius: 18px !important;
-        box-shadow: 0 8px 40px rgba(0,0,0,0.3) !important;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.35) !important;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }}
     div[data-testid="stChatInput"]:focus-within {{
         border-color: {_accent} !important;
-        box-shadow: 0 8px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,212,170,0.15) !important;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,212,170,0.2) !important;
     }}
     div[data-testid="stChatInput"] textarea {{
         background: transparent !important;
@@ -452,7 +486,7 @@ theme_css = f"""
         min-height: 56px !important;
     }}
 
-    /* ── TYPING ── */
+    /* ── TYPING INDICATOR ── */
     .typing-indicator {{
         display: flex; align-items: center; gap: 6px;
     }}
@@ -468,43 +502,55 @@ theme_css = f"""
     /* ── BUTTONS ── */
     .stButton > button {{
         border-radius: 10px !important; font-weight: 500 !important; font-size: 13px !important;
-        transition: all 0.2s ease !important;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         border: 1px solid {_card_border} !important;
         background: {_card_bg} !important;
         color: {_text} !important;
+        position: relative; overflow: hidden;
     }}
     .stButton > button:hover {{
         border-color: {_accent} !important;
-        box-shadow: 0 0 20px rgba(0,212,170,0.1) !important;
+        box-shadow: 0 0 24px rgba(0,212,170,0.12) !important;
+        transform: translateY(-1px) !important;
+    }}
+    .stButton > button:active {{
+        transform: scale(0.97) !important;
     }}
 
     /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 4px;
         background: {_card_bg};
-        backdrop-filter: blur(16px);
-        border-radius: 12px;
-        padding: 4px;
+        backdrop-filter: blur(20px);
+        border-radius: 14px;
+        padding: 5px;
         border: 1px solid {_card_border};
         margin-bottom: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }}
     .stTabs [data-baseweb="tab"] {{
-        border-radius: 9px !important;
+        border-radius: 10px !important;
         font-weight: 500 !important;
         font-size: 13px !important;
-        padding: 5px 14px !important;
+        padding: 6px 16px !important;
         color: {_text2} !important;
+        transition: all 0.3s ease !important;
+    }}
+    .stTabs [data-baseweb="tab"]:hover {{
+        color: {_text} !important;
+        background: rgba(255,255,255,0.03) !important;
     }}
     .stTabs [aria-selected="true"] {{
         background: {_accent_grad} !important;
         color: #000 !important;
         font-weight: 600 !important;
+        box-shadow: 0 4px 16px rgba(0,212,170,0.15) !important;
     }}
 
     /* ── SIDEBAR ── */
     section[data-testid="stSidebar"] > div:nth-child(1) {{
         background: {_card_bg};
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(24px);
         border-right: 1px solid {_card_border};
     }}
     section[data-testid="stSidebar"] .sidebar-content {{ background: transparent; }}
@@ -514,33 +560,29 @@ theme_css = f"""
     }}
     .stSidebar div[data-testid="stExpander"] {{
         border: none !important; background: transparent !important;
+        margin-bottom: 0 !important;
     }}
     .stSidebar .stExpander > div:first-child > div:first-child {{
         font-weight: 600 !important; font-size: 12px !important;
         color: {_text2} !important; letter-spacing: 0.02em;
+        transition: color 0.2s ease !important;
+    }}
+    .stSidebar .stExpander > div:first-child > div:first-child:hover {{
+        color: {_accent} !important;
     }}
     .stSidebar hr {{ border-color: {_card_border} !important; margin: 0.5rem 0; }}
 
-    /* ── SIDEBAR TRACE ── */
-    .trace-line {{
-        position: relative; padding: 5px 0 5px 16px; margin-bottom: 2px;
-        animation: fadeIn 0.25s ease;
+    /* ── SIDEBAR ACCOUNT POPOVER ── */
+    section[data-testid="stSidebar"] .st-emotion-cache-1bfo97e {{
+        background: {_card_bg} !important;
+        backdrop-filter: blur(20px) !important;
+        border: 1px solid {_card_border} !important;
     }}
-    .trace-line::before {{
-        content: ''; position: absolute; left: 5px; top: 8px; bottom: 4px;
-        width: 1.5px;
-        background: {'rgba(255,255,255,0.06)' if mode == 'dark' else 'rgba(0,0,0,0.06)'};
+
+    /* ── SIDEBAR TOGGLE ── */
+    .stSidebar .stToggle > div > div {{
+        background: {_accent_grad} !important;
     }}
-    .trace-dot {{
-        position: absolute; left: -9px; top: 9px;
-        width: 8px; height: 8px; border-radius: 50%;
-        border: 2px solid {_bg2};
-    }}
-    .trace-dot.ok {{ background: {_accent}; }}
-    .trace-dot.err {{ background: #ef4444; }}
-    .trace-name {{ font-size: 11px; font-weight: 600; color: {_text}; }}
-    .trace-detail {{ font-size: 10px; color: {_text2}; font-family: 'JetBrains Mono', monospace; }}
-    .trace-meta {{ font-size: 9px; color: {_text2}; margin-top: 1px; }}
 
     /* ── SIDEBAR STATS ── */
     .sb-stats {{ display: flex; gap: 5px; margin: 0.4rem 0; }}
@@ -548,23 +590,49 @@ theme_css = f"""
         flex: 1; text-align: center; padding: 5px 0;
         background: {'rgba(255,255,255,0.02)' if mode == 'dark' else 'rgba(0,0,0,0.02)'};
         border-radius: 8px; border: 1px solid {_card_border};
+        transition: all 0.3s ease;
     }}
+    .sb-stat:hover {{ border-color: rgba(0,212,170,0.12); }}
     .sb-stat-val {{ font-size: 15px; font-weight: 700; color: {_accent}; }}
     .sb-stat-lbl {{ font-size: 8px; color: {_text2}; text-transform: uppercase; letter-spacing: 0.06em; }}
 
-    /* ── DASHBOARD ── */
+    /* ── SIDEBAR TRACE ── */
+    .trace-line {{
+        position: relative; padding: 5px 0 5px 16px; margin-bottom: 2px;
+        animation: fadeSlide 0.3s ease;
+    }}
+    .trace-line::before {{
+        content: ''; position: absolute; left: 5px; top: 8px; bottom: 4px;
+        width: 1.5px;
+        background: linear-gradient(180deg, {_accent}, transparent);
+        opacity: 0.15;
+    }}
+    .trace-dot {{
+        position: absolute; left: -9px; top: 9px;
+        width: 8px; height: 8px; border-radius: 50%;
+        border: 2px solid {_bg2};
+        transition: all 0.3s ease;
+    }}
+    .trace-dot.ok {{ background: {_accent}; box-shadow: 0 0 6px rgba(0,212,170,0.3); }}
+    .trace-dot.err {{ background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.3); }}
+    .trace-name {{ font-size: 11px; font-weight: 600; color: {_text}; }}
+    .trace-detail {{ font-size: 10px; color: {_text2}; font-family: 'JetBrains Mono', monospace; }}
+    .trace-meta {{ font-size: 9px; color: {_text2}; margin-top: 1px; }}
+
+    /* ── DASHBOARD CARDS ── */
     .dash-item {{
         background: {_card_bg};
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px);
         border: 1px solid {_card_border};
         border-radius: 14px;
         padding: 0.6rem;
         margin-bottom: 0.75rem;
-        transition: all 0.25s ease;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }}
     .dash-item:hover {{
-        border-color: rgba(0,212,170,0.15);
-        box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+        border-color: rgba(0,212,170,0.18);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
     }}
     .dash-item-title {{
         font-size: 12px; font-weight: 600; color: {_text};
@@ -577,11 +645,15 @@ theme_css = f"""
         background: {'rgba(255,255,255,0.03)' if mode == 'dark' else 'rgba(0,0,0,0.03)'} !important;
         border: 1px solid {_card_border} !important;
         border-radius: 10px !important; color: {_text} !important;
+        transition: border-color 0.2s ease !important;
     }}
+    .stSelectbox > div > div:hover {{ border-color: rgba(0,212,170,0.15) !important; }}
+
     .stCodeBlock {{
         background: {'rgba(0,0,0,0.25)' if mode == 'dark' else 'rgba(0,0,0,0.03)'} !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         border: 1px solid {_card_border} !important;
+        box-shadow: inset 0 1px 4px rgba(0,0,0,0.1) !important;
     }}
     .stCodeBlock code {{ font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; }}
 
@@ -589,29 +661,36 @@ theme_css = f"""
         background: {_card_bg} !important;
         border: 1px solid {_card_border} !important;
         border-radius: 12px !important;
+        animation: fadeSlide 0.3s ease !important;
     }}
 
-    .stPlotlyChart {{ background: transparent !important; border-radius: 10px; padding: 2px; }}
+    .stPlotlyChart {{ background: transparent !important; border-radius: 12px; padding: 2px; }}
     .js-plotly-plot .plotly .main-svg {{ background: transparent !important; }}
 
+    /* ── METRIC CARDS ── */
     .metric-card {{
         background: {_card_bg}; border: 1px solid {_card_border}; border-radius: 12px;
         padding: 0.8rem; text-align: center;
+        transition: all 0.3s ease;
     }}
+    .metric-card:hover {{ border-color: rgba(0,212,170,0.12); transform: translateY(-1px); }}
     .metric-val {{
         font-size: 24px; font-weight: 700;
         background: {_accent_grad}; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }}
     .metric-lbl {{ font-size: 10px; color: {_text2}; margin-top: 3px; }}
 
-    @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(6px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    /* ── KEYFRAMES ── */
+    @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
     @keyframes bounce {{ 0%,60%,100% {{ transform: translateY(0); }} 30% {{ transform: translateY(-7px); }} }}
     @keyframes pulse {{ 0%,100% {{ opacity: 1; }} 50% {{ opacity: 0.4; }} }}
+
     .app-footer {{
         position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
         text-align: center; padding: 8px; font-size: 12px;
         background: {_bg2}; color: {_text2};
         border-top: 1px solid {_card_border};
+        backdrop-filter: blur(12px);
     }}
     .login-footer {{
         text-align: center; padding: 20px; font-size: 12px; color: #7a7d91;
@@ -621,8 +700,8 @@ theme_css = f"""
     .dash-wallpaper {{
         position: fixed; inset: 0; z-index: 0; pointer-events: none;
         background:
-            radial-gradient(ellipse at 20% 20%, rgba(0,212,170,0.04) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.04) 0%, transparent 50%),
+            radial-gradient(ellipse at 15% 20%, rgba(0,212,170,0.05) 0%, transparent 50%),
+            radial-gradient(ellipse at 85% 75%, rgba(124,58,237,0.05) 0%, transparent 50%),
             {_bg};
     }}
     .dash-wallpaper::before {{
@@ -654,7 +733,7 @@ theme_css = f"""
     .dash-chart-bars span:nth-child(8) {{ height: 60px; animation-delay: 2.1s; }}
     @keyframes dashBarPulse {{
         0%, 100% {{ transform: scaleY(1); opacity: 1; }}
-        50% {{ transform: scaleY(1.1); opacity: 0.7; }}
+        50% {{ transform: scaleY(1.08); opacity: 0.7; }}
     }}
 </style>
 <div class="gradient-bar"></div>
