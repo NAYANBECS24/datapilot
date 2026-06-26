@@ -13,6 +13,7 @@ from tools.insight_tool import prepare_explanation_context, detect_anomalies
 from tools.analytics_tool import generate_forecast, compare_segments
 from tools.quality_tool import scan_quality
 from tools.report_tool import generate_report
+from tools.rag_tool import retrieve_context
 from tools.db_manager import DEFAULT_CONN_STRING
 from trace.tracer import AgentTracer, timed
 
@@ -182,6 +183,7 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             kw.get("value_col", ""),
             kw.get("category_col", ""),
         ),
+        "retrieve_context": lambda **kw: retrieve_context(kw.get("query", ""), username=username, top_k=int(kw.get("top_k", 5))),
         "scan_quality": lambda **kw: scan_quality(DB_PATH),
         "generate_report": lambda **kw: generate_report(
             _normalise_data(kw.get("data", [])),
@@ -407,23 +409,31 @@ USER-UPLOADED DATA:
   any uploaded tables will appear with an "uploads." prefix (e.g. "uploads.my_table").
   These tables live in a separate database file but you can query them with normal SQL.
 
+UPLOADED DOCUMENTS (RAG):
+  Users can upload PDF, TXT, and MD files. These are chunked, embedded, and stored in a vector database.
+  When a user asks about document content, call retrieve_context to search relevant passages.
+  Combine document context with SQL results for richer answers. Always cite the source filename.
+
 RULES:
-  1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
-     This also discovers any user-uploaded tables.
-  2. Only write read-only SELECT queries. Never DML/DDL.
-  3. When a chart or diagram helps, call generate_chart or generate_flowchart.
-  4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
-     Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
-  5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
-  6. After getting data, write a short clear summary with real numbers.
-  7. Suggest one follow-up question the user might ask next.
-  8. Be concise. Let charts and diagrams do the heavy lifting.
-  9. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
-     a time period), ask a short clarifying question instead of guessing.
- 10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
-     in follow-up questions. They refer to entities from the previous turn, not all data.
- 11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
-     You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
+   1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
+      This also discovers any user-uploaded tables.
+   2. Only write read-only SELECT queries. Never DML/DDL.
+   3. When a chart or diagram helps, call generate_chart or generate_flowchart.
+   4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
+      Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
+   5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
+   6. After getting data, write a short clear summary with real numbers.
+   7. Suggest one follow-up question the user might ask next.
+   8. Be concise. Let charts and diagrams do the heavy lifting.
+   9. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
+      a time period), ask a short clarifying question instead of guessing.
+  10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
+      in follow-up questions. They refer to entities from the previous turn, not all data.
+  11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
+      You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
+  12. DOCUMENTS (RAG): When a user asks about document/report content, call retrieve_context
+      to search uploaded PDF/TXT/MD files. Use the passages to inform your answer and cite the
+      filename. You can combine document context with database results.
 """
 
 TOOLS = [
@@ -533,6 +543,21 @@ TOOLS = [
                     "category_col": {"type": "string", "description": "Optional category column for breakdown."},
                 },
                 "required": ["data_a", "data_b", "value_col"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "retrieve_context",
+            "description": "Search uploaded PDF/TXT/MD documents (RAG) for passages relevant to a query. Use when the user asks about uploaded documents, reports, or policy content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query to find relevant document passages."},
+                    "top_k": {"type": "integer", "description": "Number of top passages to return (default 5)."},
+                },
+                "required": ["query"],
             },
         },
     },

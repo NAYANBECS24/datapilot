@@ -1165,6 +1165,23 @@ with st.sidebar:
                 else:
                     st.error(r["error"])
 
+    with st.expander("📄 Upload Document (PDF/TXT/MD)" + _upload_label, expanded=False):
+        st.markdown(f'<span style="font-size:12px;color:{_text2};">Upload PDF, TXT, or Markdown files. The agent can search them using RAG. Ask: "What does the report say about X?"</span>', unsafe_allow_html=True)
+        uploaded_doc = st.file_uploader("Choose document", type=["pdf", "txt", "md", "json"], label_visibility="collapsed", key="doc_upload")
+        if uploaded_doc:
+            if st.button("Index Document", use_container_width=True):
+                import tempfile
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_doc.name.split('.')[-1]}")
+                tmp.write(uploaded_doc.getbuffer())
+                tmp.close()
+                from tools.rag_tool import upload_document
+                r = upload_document(tmp.name, uploaded_doc.name, username=_current_user)
+                os.unlink(tmp.name)
+                if r["success"]:
+                    st.success(f"Indexed '{r['filename']}' — {r['chunks']} chunks, {r['char_count']} chars")
+                else:
+                    st.error(r["error"])
+
     with st.popover("📂 My Uploaded Files", help="See and manage uploaded files"):
         st.caption(f"Files in {_upload_label.strip()}")
         flist = list_uploaded_files(username=_current_user)
@@ -1256,8 +1273,8 @@ with st.sidebar:
 
 # ── TABS ─────────────────────────────────────────────────────────────────
 
-tab_chat, tab_data, tab_dashboard, tab_profiler, tab_insights = st.tabs(
-    ["💬 Chat", "🗂️ My Data", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights"]
+tab_chat, tab_data, tab_dashboard, tab_profiler, tab_insights, tab_docs = st.tabs(
+    ["💬 Chat", "🗂️ My Data", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights", "📄 Documents"]
 )
 
 
@@ -1988,3 +2005,51 @@ with tab_insights:
         st.markdown("### Uploaded Tables")
         for u in ut["tables"]:
             st.markdown(f"- **`uploads.{u['table_name']}`** — {u['row_count']} rows, {len(u['columns'])} cols")
+
+
+# ══════════════════════════════ DOCUMENTS ═══════════════════════════════
+
+with tab_docs:
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.25rem;">'
+        f'<span style="font-size:20px;font-weight:700;">📄 Document Library</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Uploaded PDF, TXT, and Markdown files — the agent can search them with RAG.")
+
+    from tools.rag_tool import list_documents, delete_document, clear_documents, get_chunks_for_doc
+
+    docs = list_documents(username=_current_user)
+
+    if not docs.get("success") or not docs["documents"]:
+        st.info("No documents uploaded yet. Upload PDF/TXT/MD files from the sidebar.")
+    else:
+        for d in docs["documents"]:
+            with st.container():
+                c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
+                with c1:
+                    st.markdown(f"📄 **{d['filename']}**")
+                with c2:
+                    st.markdown(f"`{d['size_kb']} KB`")
+                with c3:
+                    if st.button("🔍 Chunks", key=f"chk_{d['id']}", use_container_width=True):
+                        st.session_state[f"show_chunks_{d['id']}"] = not st.session_state.get(f"show_chunks_{d['id']}", False)
+                with c4:
+                    if st.button("🗑️", key=f"del_doc_{d['id']}", help="Delete"):
+                        delete_document(d["id"], username=_current_user)
+                        st.rerun()
+
+                if st.session_state.get(f"show_chunks_{d['id']}"):
+                    chunks = get_chunks_for_doc(d["id"], username=_current_user)
+                    if chunks:
+                        for ch in chunks[:10]:
+                            st.markdown(f'<div style="font-size:12px;color:{_text2};padding:2px 0 2px 16px;border-left:2px solid {_accent};margin:2px 0;">Chunk {ch["index"]}: {ch["text"][:300]}{"..." if len(ch["text"]) > 300 else ""}</div>', unsafe_allow_html=True)
+                        if len(chunks) > 10:
+                            st.caption(f"… and {len(chunks) - 10} more chunks")
+                    else:
+                        st.caption("No chunks found.")
+                st.divider()
+
+        if st.button("🗑️ Clear All Documents", use_container_width=True, type="secondary"):
+            clear_documents(username=_current_user)
+            st.rerun()
