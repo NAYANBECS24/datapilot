@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from fpdf import FPDF
 
 from agent import LANGUAGES, run_agent_turn, get_llm_status
 from trace.tracer import AgentTracer
@@ -456,6 +457,46 @@ def _now() -> str:
     return datetime.now().strftime("%I:%M %p")
 
 
+def _word_stream(text: str):
+    words = text.split(" ")
+    for i in range(0, len(words), 3):
+        yield " ".join(words[i:i + 3]) + " "
+        time.sleep(0.015)
+
+
+def _generate_pdf_report(messages: list) -> bytes:
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.add_font("DejaVu", "", "C:/Windows/Fonts/DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 16)
+    pdf.set_text_color(0, 212, 170)
+    pdf.cell(0, 12, "DataPilot - Conversation Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(200, 200, 200)
+    pdf.set_font("DejaVu", "", 8)
+    pdf.cell(0, 6, f"Generated {datetime.now().strftime('%b %d, %Y at %I:%M %p')}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(6)
+
+    for m in messages:
+        if m["role"] == "user":
+            pdf.set_fill_color(0, 212, 170)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font("DejaVu", "", 11)
+            pdf.multi_cell(0, 7, f"You: {m.get('content', '')}", fill=True)
+        else:
+            pdf.set_fill_color(20, 22, 36)
+            pdf.set_text_color(220, 220, 220)
+            pdf.set_font("DejaVu", "", 11)
+            reply = m.get("reply", "")
+            pdf.multi_cell(0, 7, f"DataPilot: {reply}", fill=True)
+            for q in m.get("sql_queries", []):
+                pdf.set_font("Courier", "", 8)
+                pdf.set_text_color(100, 150, 255)
+                pdf.multi_cell(0, 5, f"SQL: {q['sql']}")
+        pdf.ln(3)
+
+    return pdf.output()
+
+
 SCHEMA_CACHE = None
 def _get_schema():
     global SCHEMA_CACHE
@@ -490,7 +531,7 @@ WELCOME_CARDS = [
     ("👥", "Top Customers", "Which customers have placed the most orders?"),
     ("📐", "ER Diagram", "Draw me the ER diagram for this database"),
     ("🔄", "Order Flow", "Create a flowchart of how an order moves through our system"),
-    ("📊", "Categories", "Show me revenue breakdown by product category"),
+    ("🌳", "Decision Tree", "Create a decision tree for prioritizing which products to restock based on sales velocity and profit margin"),
 ]
 
 SUGGESTION_CHIPS = [c[2] for c in WELCOME_CARDS]
@@ -640,6 +681,23 @@ with st.sidebar:
                     st.success("No anomalies found.")
         else:
             st.caption("Run a query first.")
+
+    with st.expander("🔗 Share", expanded=False):
+        st.caption("Share this conversation with your team.")
+        share_lines = []
+        for m in st.session_state.messages:
+            role = "You" if m["role"] == "user" else "DataPilot"
+            c = m.get("reply") if m["role"] == "assistant" else m.get("content", "")
+            if c:
+                share_lines.append(f"{role}: {c[:200]}")
+        share_text = "\n\n".join(share_lines) if share_lines else "No conversation yet."
+        if st.button("📋 Copy to Clipboard", use_container_width=True):
+            st.toast("📋 Copied to clipboard!")
+            st.markdown(
+                f'<textarea id="share-box" style="position:fixed;left:-9999px;">{share_text}</textarea>'
+                f'<script>navigator.clipboard.writeText(document.getElementById("share-box").value)</script>',
+                unsafe_allow_html=True,
+            )
 
     with st.expander("📜 History", expanded=False):
         if st.session_state.query_history:
@@ -794,7 +852,8 @@ with tab_chat:
 
     # ── EXPORT ──
     if has_msgs:
-        with st.columns([3, 1])[1]:
+        e1, e2 = st.columns(2)
+        with e1:
             lines = []
             for m in st.session_state.messages:
                 role = "**You**" if m["role"] == "user" else "**DataPilot**"
@@ -803,8 +862,14 @@ with tab_chat:
                 for q in m.get("sql_queries", []):
                     lines.append(f"> ```sql\n> {q['sql']}\n> ```")
             st.download_button(
-                "📥 Export", data="\n\n".join(lines).encode(),
+                "📥 Markdown", data="\n\n".join(lines).encode(),
                 file_name="chat.md", mime="text/markdown", use_container_width=True,
+            )
+        with e2:
+            pdf_bytes = _generate_pdf_report(st.session_state.messages)
+            st.download_button(
+                "📕 PDF Report", data=pdf_bytes,
+                file_name="datapilot_report.pdf", mime="application/pdf", use_container_width=True,
             )
 
     # ── SUGGESTION PILLS (compact, shown when chatting) ──
@@ -896,51 +961,85 @@ with tab_chat:
         if prompt not in st.session_state.query_history:
             st.session_state.query_history.append(prompt)
 
+        api_hist = []
+        for m in st.session_state.messages[:-1]:
+            if m["role"] == "user":
+                api_hist.append({"role": "user", "content": m["content"]})
+            elif m["role"] == "assistant" and m.get("reply"):
+                api_hist.append({"role": "assistant", "content": m["reply"]})
+
+        tracer = AgentTracer()
+
         with st.chat_message("assistant"):
-            with st.spinner(""):
-                st.markdown(
-                    f'<div class="msg-row assistant">'
-                    f'<div class="msg-avatar">🤖</div>'
-                    f'<div class="typing-indicator">'
-                    f'<div class="typing-dots"><span></span><span></span><span></span></div>'
-                    f'<span style="font-size:13px;color:{_text2};margin-left:6px;">Thinking...</span>'
-                    f'</div></div>',
-                    unsafe_allow_html=True,
-                )
-
-                tracer = AgentTracer()
-                api_hist = []
-                for m in st.session_state.messages[:-1]:
-                    if m["role"] == "user":
-                        api_hist.append({"role": "user", "content": m["content"]})
-                    elif m["role"] == "assistant" and m.get("reply"):
-                        api_hist.append({"role": "assistant", "content": m["reply"]})
-
+            with st.spinner("Running tools..."):
                 try:
                     result = run_agent_turn(prompt, api_hist, tracer, language=st.session_state.language)
                 except Exception as e:
                     result = {"reply": f"⚠️ {e}", "charts": [], "diagrams": [], "sql_queries": []}
 
-                st.session_state.trace_log = tracer.events_for_turn()
+            st.session_state.trace_log = tracer.events_for_turn()
 
-                sql_list = result.get("sql_queries", [])
-                dr, dc = None, None
-                if sql_list:
-                    last_q = sql_list[-1]
-                    dr = last_q.get("rows", [])
-                    dc = last_q.get("columns", [])
+            reply = result.get("reply", "")
+            streamed_reply = st.write_stream(_word_stream(reply))
 
-                payload = {
-                    "role": "assistant",
-                    "reply": result.get("reply", ""),
-                    "charts": result.get("charts", []),
-                    "diagrams": result.get("diagrams", []),
-                    "sql_queries": sql_list,
-                    "data_rows": dr,
-                    "data_cols": dc,
-                }
-                st.session_state.messages.append(payload)
-                st.rerun()
+            sql_list = result.get("sql_queries", [])
+            dr, dc = None, None
+            if sql_list:
+                last_q = sql_list[-1]
+                dr = last_q.get("rows", [])
+                dc = last_q.get("columns", [])
+
+            if sql_list and st.session_state.show_sql:
+                for qinfo in sql_list:
+                    st.code(qinfo["sql"], language="sql")
+                    st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
+
+            for i, fig_dict in enumerate(result.get("charts", [])):
+                fig = go.Figure(fig_dict)
+                apply_chart_theme(fig)
+                fig.update_layout(height=340)
+                st.plotly_chart(fig, use_container_width=True, key=f"new_c_{i}", config={"displaylogo": False})
+
+                bar_cols = st.columns(4)
+                with bar_cols[0]:
+                    if st.button("📌 Pin", key=f"new_pin_{i}", use_container_width=True):
+                        title = fig_dict.get("layout", {}).get("title", {}).get("text", "Untitled")
+                        st.session_state.pinned.append({"title": title, "figure": fig_dict})
+                        st.toast(f"📌 Pinned '{title}'")
+                with bar_cols[1]:
+                    try:
+                        png = fig_to_png_bytes(fig_dict)
+                        b64 = base64.b64encode(png).decode()
+                        st.markdown(
+                            f'<a href="data:image/png;base64,{b64}" download="chart_{i}.png" '
+                            f'class="action-btn">⬇ PNG</a>',
+                            unsafe_allow_html=True,
+                        )
+                    except Exception:
+                        pass
+                with bar_cols[2]:
+                    if dr and dc:
+                        csv_b = pd.DataFrame(dr, columns=dc).to_csv(index=False).encode()
+                        b64 = base64.b64encode(csv_b).decode()
+                        st.markdown(
+                            f'<a href="data:text/csv;base64,{b64}" download="data.csv" '
+                            f'class="action-btn">⬇ CSV</a>',
+                            unsafe_allow_html=True,
+                        )
+
+            for mermaid_code in result.get("diagrams", []):
+                render_mermaid(mermaid_code)
+
+            payload = {
+                "role": "assistant",
+                "reply": reply,
+                "charts": result.get("charts", []),
+                "diagrams": result.get("diagrams", []),
+                "sql_queries": sql_list,
+                "data_rows": dr,
+                "data_cols": dc,
+            }
+            st.session_state.messages.append(payload)
 
 
 # ══════════════════════════════ DASHBOARD ════════════════════════════════

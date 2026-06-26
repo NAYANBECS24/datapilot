@@ -60,11 +60,47 @@ def _process_flow(steps: List[str], decision_points: Optional[Dict[str, List[str
     return "\n".join(lines)
 
 
+def _decision_tree(question: str, branches: List[Dict[str, Any]]) -> str:
+    lines = ["flowchart TD"]
+    qid = "Q0"
+    safe_q = question.replace('"', "'").replace("\n", " ")
+    lines.append(f'    {qid}["{safe_q}"]')
+
+    node_counter = 1
+    edge_counter = 1
+
+    def add_branch(parent_id, label, children, depth=0):
+        nonlocal node_counter, edge_counter
+        nid = f"N{node_counter}"
+        node_counter += 1
+        safe_label = label.replace('"', "'").replace("\n", " ")
+        if children:
+            lines.append(f'    {nid}{"{"}"{safe_label}{"{"}')
+            eid = f"E{edge_counter}"
+            edge_counter += 1
+            lines.append(f'    {parent_id} -->|{safe_label}| {nid}')
+            for child in children:
+                add_branch(nid, child.get("label", ""), child.get("children", []), depth + 1)
+        else:
+            lines.append(f'    {nid}["{safe_label}"]')
+            eid = f"E{edge_counter}"
+            edge_counter += 1
+            lines.append(f'    {parent_id} -->|{safe_label}| {nid}')
+            lines.append(f'    style {nid} fill:#00d4aa20,stroke:#00d4aa,stroke-width:1px')
+
+    for branch in branches:
+        add_branch(qid, branch.get("label", ""), branch.get("children", []))
+
+    return "\n".join(lines)
+
+
 def generate_flowchart(
     diagram_type: str,
     schema: Optional[Union[str, Dict[str, Any]]] = None,
     steps: Optional[List[str]] = None,
     decision_points: Optional[Dict[str, List[str]]] = None,
+    question: Optional[str] = None,
+    branches: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     try:
         if diagram_type == "er_diagram":
@@ -75,12 +111,16 @@ def generate_flowchart(
                     "error": "A valid schema dict is required for er_diagram. Call get_schema first and pass its result (or the nested 'schema' key).",
                 }
             code = _er_diagram(schema)
+        elif diagram_type == "decision_tree":
+            if not question or not branches:
+                return {"success": False, "error": "question and branches are required for decision_tree."}
+            code = _decision_tree(question, branches)
         elif diagram_type == "process_flow":
             if not steps:
                 return {"success": False, "error": "steps list is required for process_flow."}
             code = _process_flow(steps, decision_points)
         else:
-            return {"success": False, "error": "diagram_type must be 'er_diagram' or 'process_flow'."}
+            return {"success": False, "error": "diagram_type must be 'er_diagram', 'decision_tree', or 'process_flow'."}
 
         return {"success": True, "diagram_type": diagram_type, "mermaid_code": code}
 

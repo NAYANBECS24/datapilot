@@ -3,7 +3,6 @@ __pycache__/
 .env
 db/sample_ecommerce.db
 .streamlit/secrets.toml
-.streamlit/
 .vscode/
 .DS_Store
 *.log

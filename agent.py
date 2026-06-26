@@ -69,6 +69,113 @@ def _call_llm(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> An
         raise RuntimeError(f"LLM API call failed ({LLM_PROVIDER}): {e}")
 
 
+def _call_llm_stream(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]):
+    client = _get_llm_client()
+    model = NVIDIA_MODEL if LLM_PROVIDER == "nvidia" else (OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL)
+
+    if LLM_PROVIDER == "anthropic":
+        text = _call_anthropic(client, model, messages, tools).content
+        for chunk in _chunk_text(text):
+            yield chunk
+    else:
+        stream = client.chat.completions.create(
+            model=model,
+            max_tokens=4000,
+            tools=tools,
+            messages=messages,
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+
+def _chunk_text(text: str, size: int = 5) -> List[str]:
+    words = text.split(" ")
+    for i in range(0, len(words), size):
+        yield " ".join(words[i:i + size]) + " "
+
+
+def run_agent_turn_stream(
+    user_message: str,
+    history: List[Dict[str, Any]],
+    tracer: AgentTracer,
+    language: str = "en",
+):
+    lang_instruction = LANGUAGES.get(language, "")
+    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction)
+
+    messages = [{"role": "system", "content": system_content}] + history + [{"role": "user", "content": user_message}]
+
+    charts = []
+    diagrams = []
+    sql_queries = []
+    sql_retry_count = 0
+
+    while True:
+        try:
+            msg = _call_llm(messages, TOOLS)
+        except Exception as e:
+            yield {"type": "reply", "content": f"⚠️ Sorry, I encountered an error contacting the LLM provider (**{LLM_PROVIDER}**).\n\n> {e}\n\nPlease check your API key and try again."}
+            return
+
+        if not msg.tool_calls:
+            yield {"type": "charts", "content": charts}
+            yield {"type": "diagrams", "content": diagrams}
+            yield {"type": "sql_queries", "content": sql_queries}
+            yield {"type": "stream_start", "content": ""}
+            for chunk in _chunk_text(msg.content or ""):
+                yield {"type": "stream", "content": chunk}
+            yield {"type": "stream_end", "content": ""}
+            return
+
+        messages.append({"role": "assistant", "content": msg.content, "tool_calls": msg.tool_calls})
+        tool_results = []
+
+        for tc in msg.tool_calls:
+            tool_name = tc.function.name
+            try:
+                tool_input = json.loads(tc.function.arguments) if tc.function.arguments else {}
+            except json.JSONDecodeError:
+                tool_input = {}
+
+            with timed() as t:
+                fn = TOOL_IMPL.get(tool_name)
+                result = fn(**tool_input) if fn else {"success": False, "error": f"Unknown tool '{tool_name}'"}
+            tracer.log_tool_call(tool_name, tool_input, result, t.ms)
+
+            if tool_name == "execute_query" and not result.get("success"):
+                sql_retry_count += 1
+                if sql_retry_count > MAX_SQL_RETRIES:
+                    result["error"] = (
+                        result.get("error", "")
+                        + f" (gave up after {MAX_SQL_RETRIES} retries — please rephrase.)"
+                    )
+
+            if tool_name == "execute_query" and result.get("success"):
+                sql_queries.append({
+                    "sql": result.get("sql", ""),
+                    "columns": result.get("columns", []),
+                    "rows": result.get("rows", []),
+                    "row_count": result.get("row_count", 0),
+                    "latency_ms": result.get("latency_ms", 0),
+                })
+
+            if tool_name == "generate_chart" and result.get("success"):
+                charts.append(result["figure"])
+            if tool_name == "generate_flowchart" and result.get("success"):
+                diagrams.append(result["mermaid_code"])
+
+            tool_results.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result)[:8000],
+            })
+
+        messages.extend(tool_results)
+
+
 def _call_openai_compat(client, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
     response = client.chat.completions.create(
         model=model,
@@ -234,23 +341,25 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "generate_flowchart",
-            "description": "Generate a Mermaid ER diagram (from get_schema result) or a process-flow diagram (from ordered steps).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "diagram_type": {"type": "string", "enum": ["er_diagram", "process_flow"]},
-                    "schema": {"type": "object", "description": "For er_diagram: pass the FULL result from get_schema (with success and schema keys)."},
-                    "steps": {"type": "array", "items": {"type": "string"}, "description": "For process_flow: ordered stage labels."},
-                    "decision_points": {"type": "object", "description": "Optional branching, e.g. {'Confirmed': ['Cancelled']}."},
+        {
+            "type": "function",
+            "function": {
+                "name": "generate_flowchart",
+                "description": "Generate a Mermaid ER diagram (from get_schema result), a decision tree (from question/branches), or a process-flow diagram (from ordered steps).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "diagram_type": {"type": "string", "enum": ["er_diagram", "decision_tree", "process_flow"]},
+                        "schema": {"type": "object", "description": "For er_diagram: pass the FULL result from get_schema (with success and schema keys)."},
+                        "question": {"type": "string", "description": "For decision_tree: the root question."},
+                        "branches": {"type": "array", "description": "For decision_tree: list of {label, children?} dicts representing decision branches.", "items": {"type": "object"}},
+                        "steps": {"type": "array", "items": {"type": "string"}, "description": "For process_flow: ordered stage labels."},
+                        "decision_points": {"type": "object", "description": "Optional branching, e.g. {'Confirmed': ['Cancelled']}."},
+                    },
+                    "required": ["diagram_type"],
                 },
-                "required": ["diagram_type"],
             },
         },
-    },
     {
         "type": "function",
         "function": {
@@ -287,6 +396,8 @@ TOOL_IMPL: Dict[str, Any] = {
         _normalise_schema(kw.get("schema")),
         kw.get("steps"),
         kw.get("decision_points"),
+        kw.get("question"),
+        kw.get("branches"),
     ),
 
     "explain_data": lambda **kw: prepare_explanation_context(

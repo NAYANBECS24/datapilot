@@ -24,6 +24,12 @@ try:
 except ImportError:
     pass
 
+try:
+    import pymongo
+    DB_TYPES["mongodb"] = "pymongo"
+except ImportError:
+    pass
+
 DEFAULT_ROW_LIMIT = 200
 BLOCKED_KEYWORDS = (
     "insert", "update", "delete", "drop", "alter", "create",
@@ -82,6 +88,11 @@ def parse_connection_string(conn_str: str) -> Dict[str, Any]:
         database = host_db[1] if len(host_db) > 1 else ""
         return {"type": "mysql", "host": host, "port": port, "user": user, "password": password, "database": database}
 
+    if conn_str.startswith("mongodb://") or conn_str.startswith("mongodb+srv://"):
+        uri = conn_str
+        db_name = os.getenv("MONGO_DB_NAME", "default")
+        return {"type": "mongodb", "uri": uri, "database": db_name}
+
     return {"type": "sqlite", "database": conn_str}
 
 
@@ -97,6 +108,8 @@ class DatabaseManager:
             return self._postgresql_schema()
         elif self.db_type == "mysql":
             return self._mysql_schema()
+        elif self.db_type == "mongodb":
+            return self._mongodb_schema()
         return {"success": False, "error": f"Unsupported database type: {self.db_type}"}
 
     def execute_query(self, sql: str) -> Dict[str, Any]:
@@ -114,6 +127,8 @@ class DatabaseManager:
                 return self._postgresql_execute(safe_sql, start)
             elif self.db_type == "mysql":
                 return self._mysql_execute(safe_sql, start)
+            elif self.db_type == "mongodb":
+                return self._mongodb_execute(safe_sql, start)
             return {"success": False, "sql": safe_sql, "error": f"Unsupported database type: {self.db_type}"}
         except Exception as e:
             return {"success": False, "sql": safe_sql, "error": str(e)}
@@ -266,6 +281,76 @@ class DatabaseManager:
         return {
             "success": True, "sql": sql, "columns": columns,
             "rows": [dict(r) for r in rows], "row_count": len(rows), "latency_ms": latency_ms,
+        }
+
+
+    def _mongodb_schema(self) -> Dict[str, Any]:
+        try:
+            client = pymongo.MongoClient(self.params["uri"], serverSelectionTimeoutMS=5000)
+            db = client[self.params["database"]]
+            collections = db.list_collection_names()
+
+            schema: Dict[str, Any] = {"tables": {}, "relationships": []}
+
+            for coll in collections:
+                sample = db[coll].find_one()
+                columns = []
+                if sample:
+                    for key, val in sample.items():
+                        col_type = type(val).__name__ if val is not None else "null"
+                        columns.append({"name": key, "type": col_type, "primary_key": key == "_id"})
+                schema["tables"][coll] = {"columns": columns, "foreign_keys": []}
+
+            client.close()
+            return {"success": True, "schema": schema}
+        except Exception as e:
+            return {"success": False, "error": f"MongoDB schema error: {e}"}
+
+    def _mongodb_execute(self, sql: str, start: float) -> Dict[str, Any]:
+        import re
+
+        client = pymongo.MongoClient(self.params["uri"], serverSelectionTimeoutMS=5000)
+        db = client[self.params["database"]]
+
+        m = re.match(r"SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.*))?(?:\s+LIMIT\s+(\d+))?\s*$", sql, re.IGNORECASE)
+        if not m:
+            client.close()
+            return {"success": False, "sql": sql, "error": "MongoDB only supports simple SELECT ... FROM ... WHERE ... LIMIT queries."}
+
+        fields_str = m.group(1).strip()
+        collection_name = m.group(2)
+        where_clause = m.group(3)
+        limit = int(m.group(4)) if m.group(4) else DEFAULT_ROW_LIMIT
+
+        if collection_name not in db.list_collection_names():
+            client.close()
+            return {"success": False, "sql": sql, "error": f"Collection '{collection_name}' not found."}
+
+        qfilter = {}
+        if where_clause:
+            op_map = {"=": "$eq", ">": "$gt", "<": "$lt", ">=": "$gte", "<=": "$lte", "!=": "$ne", "<>": "$ne"}
+            cond_match = re.match(r"(\w+)\s*(=|>|<|>=|<=|!=|<>)\s*(.+)", where_clause)
+            if cond_match:
+                field, op, val_str = cond_match.groups()
+                val_str = val_str.strip().strip("'\"")
+                val = float(val_str) if val_str.replace(".", "", 1).isdigit() else val_str
+                qfilter[field] = {op_map.get(op, "$eq"): val}
+
+        projection = None
+        if fields_str != "*":
+            projection = {f.strip(): 1 for f in fields_str.split(",")}
+            if projection and "_id" not in projection:
+                projection["_id"] = 0
+
+        cursor = db[collection_name].find(qfilter, projection).limit(limit)
+        rows = list(cursor)
+        columns = list(rows[0].keys()) if rows else []
+        client.close()
+
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "success": True, "sql": sql, "columns": columns,
+            "rows": rows, "row_count": len(rows), "latency_ms": latency_ms,
         }
 
 
