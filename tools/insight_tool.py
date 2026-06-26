@@ -192,7 +192,7 @@ def _generate_auto_insights_pg(conn_str: str) -> Dict[str, Any]:
         import psycopg2.extras
 
         from tools.db_manager import parse_connection_string
-        params = parse_connection_string(conn_str)
+        params = parse_conrenection_string(conn_str)
         pg_params = {k: v for k, v in params.items() if k != "type"}
 
         conn = psycopg2.connect(**pg_params)

@@ -142,16 +142,16 @@ if not st.session_state.user:
         .login-dot:nth-child(8) {{ top: 10%; left: 80%; animation-delay: 3.0s; }}
 
         /* Card styling — applied to the vertical block holding all column content */
+        /* Login card — targets the middle column's content block */
         div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] {{
             background: rgba(10, 12, 22, 0.75) !important;
             backdrop-filter: blur(24px) !important;
             -webkit-backdrop-filter: blur(24px) !important;
             border: 1px solid rgba(255,255,255,0.06) !important;
             border-radius: 20px !important;
-            padding: 2.5rem 2rem !important;
+            padding: 1.75rem 1.75rem !important;
             box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,170,0.04) !important;
         }}
-        /* Remove gap between card elements */
         div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] > div {{
             margin-bottom: 0 !important;
         }}
@@ -207,34 +207,36 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align:center;margin-bottom:0.5rem;'><span style='font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</span></div>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1.5rem;font-size:14px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    lcol1, lcol2, lcol3 = st.columns([1, 1.8, 1])
+    with lcol2:
+        st.markdown("<div style='text-align:center;margin-bottom:0.25rem;'><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</span></div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1rem;font-size:13px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
 
-    tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
-    with tab_log:
-        with st.form("login_form"):
-            lun = st.text_input("Username", placeholder="Enter your username")
-            lpw = st.text_input("Password", type="password", placeholder="Enter your password")
-            if st.form_submit_button("Login", use_container_width=True, type="primary"):
-                r = login(lun, lpw)
-                if r["success"]:
-                    st.session_state.user = r["username"]
-                    st.query_params["user"] = r["username"]
-                    st.rerun()
-                else:
-                    st.error(r["error"])
-    with tab_reg:
-        with st.form("register_form"):
-            run = st.text_input("Choose a username", placeholder="Min 3 characters")
-            rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
-            if st.form_submit_button("Register", use_container_width=True, type="primary"):
-                r = register(run, rpw)
-                if r["success"]:
-                    st.success("Registered! Login now.")
-                else:
-                    st.error(r["error"])
-    st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>', unsafe_allow_html=True)
+        tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
+        with tab_log:
+            with st.form("login_form"):
+                lun = st.text_input("Username", placeholder="Enter your username")
+                lpw = st.text_input("Password", type="password", placeholder="Enter your password")
+                if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                    r = login(lun, lpw)
+                    if r["success"]:
+                        st.session_state.user = r["username"]
+                        st.query_params["user"] = r["username"]
+                        st.rerun()
+                    else:
+                        st.error(r["error"])
+        with tab_reg:
+            with st.form("register_form"):
+                run = st.text_input("Choose a username", placeholder="Min 3 characters")
+                rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
+                if st.form_submit_button("Register", use_container_width=True, type="primary"):
+                    r = register(run, rpw)
+                    if r["success"]:
+                        st.success("Registered! Login now.")
+                    else:
+                        st.error(r["error"])
+    st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Hackathon 2026</div>', unsafe_allow_html=True)
     st.stop()
 
 mode = "dark" if st.session_state.dark_mode else "light"
