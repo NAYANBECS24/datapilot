@@ -616,10 +616,59 @@ theme_css = f"""
     .login-footer {{
         text-align: center; padding: 20px; font-size: 12px; color: #7a7d91;
     }}
+
+    /* ── DASHBOARD WALLPAPER ── */
+    .dash-wallpaper {{
+        position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        background:
+            radial-gradient(ellipse at 20% 20%, rgba(0,212,170,0.04) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.04) 0%, transparent 50%),
+            {_bg};
+    }}
+    .dash-wallpaper::before {{
+        content: ''; position: absolute; inset: 0;
+        background-image:
+            linear-gradient(rgba(0,212,170,0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,212,170,0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+        mask-image: radial-gradient(ellipse at 50% 30%, black 35%, transparent 70%);
+        -webkit-mask-image: radial-gradient(ellipse at 50% 30%, black 35%, transparent 70%);
+    }}
+    .dash-chart-bars {{
+        position: fixed; bottom: 5%; right: 3%; z-index: 0; opacity: 0.06;
+        display: flex; align-items: flex-end; gap: 5px;
+    }}
+    .dash-chart-bars span {{
+        display: block; width: 10px;
+        background: linear-gradient(180deg, {_accent}, {_accent2});
+        border-radius: 2px 2px 0 0;
+        animation: dashBarPulse 4s ease-in-out infinite;
+    }}
+    .dash-chart-bars span:nth-child(1) {{ height: 30px; animation-delay: 0s; }}
+    .dash-chart-bars span:nth-child(2) {{ height: 55px; animation-delay: 0.3s; }}
+    .dash-chart-bars span:nth-child(3) {{ height: 40px; animation-delay: 0.6s; }}
+    .dash-chart-bars span:nth-child(4) {{ height: 70px; animation-delay: 0.9s; }}
+    .dash-chart-bars span:nth-child(5) {{ height: 25px; animation-delay: 1.2s; }}
+    .dash-chart-bars span:nth-child(6) {{ height: 50px; animation-delay: 1.5s; }}
+    .dash-chart-bars span:nth-child(7) {{ height: 35px; animation-delay: 1.8s; }}
+    .dash-chart-bars span:nth-child(8) {{ height: 60px; animation-delay: 2.1s; }}
+    @keyframes dashBarPulse {{
+        0%, 100% {{ transform: scaleY(1); opacity: 1; }}
+        50% {{ transform: scaleY(1.1); opacity: 0.7; }}
+    }}
 </style>
 <div class="gradient-bar"></div>
 """
 st.markdown(theme_css, unsafe_allow_html=True)
+
+# Dashboard background wallpaper
+st.markdown(f'''
+<div class="dash-wallpaper"></div>
+<div class="dash-chart-bars">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+</div>
+''', unsafe_allow_html=True)
 
 team_footer = '<div class="app-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>'
 st.markdown(team_footer, unsafe_allow_html=True)
