@@ -2,8 +2,11 @@ import base64
 import io
 import json
 import os
+import re
+import sqlite3
 import time
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -618,6 +621,261 @@ def _stats():
     return 0, 0, 0
 
 
+# ── CHAT PERSISTENCE ──
+
+def _chats_dir(username: str) -> str:
+    d = os.path.join(os.path.dirname(__file__), "uploads", username, "chats")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def _chat_path(username: str, chat_id: str) -> str:
+    return os.path.join(_chats_dir(username), f"{chat_id}.json")
+
+def _save_chat(username: str):
+    if not username:
+        return
+    chat_id = st.session_state.get("_current_chat_id", "default")
+    path = _chat_path(username, chat_id)
+    data = {
+        "id": chat_id,
+        "title": st.session_state.get("_current_chat_title", "Untitled"),
+        "messages": st.session_state.get("messages", []),
+        "pinned": st.session_state.get("pinned", []),
+        "query_history": st.session_state.get("query_history", []),
+        "favorites": st.session_state.get("favorites", []),
+        "updated_at": datetime.now().isoformat(),
+    }
+    try:
+        with open(path, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+def _load_chat(username: str, chat_id: str) -> bool:
+    path = _chat_path(username, chat_id)
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        st.session_state.messages = data.get("messages", [])
+        st.session_state.pinned = data.get("pinned", [])
+        st.session_state.query_history = data.get("query_history", [])
+        st.session_state.favorites = data.get("favorites", [])
+        st.session_state._current_chat_id = data.get("id", chat_id)
+        st.session_state._current_chat_title = data.get("title", "Untitled")
+        return True
+    except Exception:
+        return False
+
+def _list_chats(username: str) -> List[Dict[str, Any]]:
+    d = _chats_dir(username)
+    if not os.path.isdir(d):
+        return []
+    chats = []
+    for f in sorted(os.listdir(d), reverse=True):
+        if f.endswith(".json"):
+            fp = os.path.join(d, f)
+            try:
+                with open(fp) as fh:
+                    data = json.load(fh)
+                chats.append({
+                    "id": data.get("id", f[:-5]),
+                    "title": data.get("title", "Untitled"),
+                    "updated_at": data.get("updated_at", ""),
+                    "msg_count": len(data.get("messages", [])),
+                })
+            except Exception:
+                chats.append({"id": f[:-5], "title": f[:-5], "updated_at": "", "msg_count": 0})
+    return chats
+
+def _new_chat(username: str):
+    chat_id = datetime.now().strftime("chat_%Y%m%d_%H%M%S")
+    st.session_state._current_chat_id = chat_id
+    st.session_state._current_chat_title = "Untitled"
+    st.session_state.messages = []
+    st.session_state.pinned = []
+    st.session_state.query_history = []
+    st.session_state.favorites = []
+
+def _delete_chat(username: str, chat_id: str):
+    path = _chat_path(username, chat_id)
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+
+
+# ── SQL EXPLAIN (calls LLM) ──
+
+def _explain_sql(sql: str) -> str:
+    try:
+        model = os.getenv("OPENAI_MODEL", "meta/llama-3.1-70b-instruct")
+        from openai import OpenAI
+        key = os.environ.get("OPENAI_API_KEY", "")
+        if not key:
+            try:
+                key = st.secrets.get("OPENAI_API_KEY", "")
+            except Exception:
+                pass
+        if not key:
+            return "No API key configured."
+        base = os.getenv("OPENAI_BASE_URL", "https://integrate.api.nvidia.com/v1")
+        client = OpenAI(api_key=key, base_url=base)
+        resp = client.chat.completions.create(
+            model=model, max_tokens=500,
+            messages=[{"role": "user", "content": f"Explain this SQL query in plain English in 2-3 sentences:\n\n{sql}"}]
+        )
+        return resp.choices[0].message.content or "Could not explain."
+    except Exception as e:
+        return f"Explain error: {e}"
+
+
+# ── DATA PREVIEW STORAGE ──
+
+def _show_data_preview(username: str, table_name: str):
+    try:
+        from tools.query_tool import _uploads_db
+        db_path = _uploads_db(username)
+        conn = sqlite3.connect(db_path)
+        df = pd.read_sql(f'SELECT * FROM "{table_name}" LIMIT 5', conn)
+        conn.close()
+        st.markdown("**Preview:**")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    except Exception:
+        pass
+
+
+# ── ONE-CLICK CHART PRESETS ──
+
+def _quick_chart(table_name: str, db_path: str, chart_type: str, x_col: str, y_col: str):
+    try:
+        conn = sqlite3.connect(db_path)
+        df = pd.read_sql(f'SELECT * FROM "{table_name}" LIMIT 200', conn)
+        conn.close()
+        if df.empty:
+            return None
+        if chart_type == "bar":
+            fig = px.bar(df, x=x_col, y=y_col, title=f"{chart_type.title()} — {table_name}")
+        elif chart_type == "line":
+            fig = px.line(df, x=x_col, y=y_col, title=f"{chart_type.title()} — {table_name}", markers=True)
+        elif chart_type == "pie":
+            fig = px.pie(df, names=x_col, values=y_col, title=f"{chart_type.title()} — {table_name}")
+        elif chart_type == "scatter":
+            fig = px.scatter(df, x=x_col, y=y_col, title=f"{chart_type.title()} — {table_name}")
+        else:
+            return None
+        apply_chart_theme(fig)
+        return fig
+    except Exception:
+        return None
+
+
+# ── SCHEMA VISUAL BROWSER ──
+
+def _render_schema_tree(tables: dict, relationships: List[dict] = None, db_path: str = ""):
+    tree_html = '<div style="padding:0.25rem 0;">'
+    for tname, tinfo in tables.items():
+        cols = tinfo.get("columns", [])
+        col_names = [c["name"] for c in cols]
+        pk = [c["name"] for c in cols if c.get("primary_key")]
+        cols_fmt = ", ".join(col_names[:4])
+        if len(col_names) > 4:
+            cols_fmt += f" … +{len(col_names)-4}"
+        tree_html += (
+            f'<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;'
+            f'margin:2px 0;border-radius:6px;background:rgba(255,255,255,0.02);">'
+            f'<span style="color:var(--accent,#00d4aa);font-size:16px;">🗂️</span>'
+            f'<span style="font-weight:600;font-size:13px;">{tname}</span>'
+            f'<span style="font-size:11px;color:var(--text2,#7a7d91);">({len(col_names)} cols, {db_path.split(os.sep)[-1] if db_path else ""})</span>'
+        )
+        if pk:
+            tree_html += f'<span style="font-size:10px;color:#f59e0b;margin-left:4px;">🔑 {", ".join(pk)}</span>'
+        tree_html += "</div>"
+        tree_html += f'<div style="font-size:11px;color:var(--text2,#7a7d91);padding:0 8px 4px 28px;">{cols_fmt}</div>'
+    tree_html += "</div>"
+    if relationships:
+        tree_html += '<div style="padding:4px 8px;font-size:11px;color:var(--text2,#7a7d91);">'
+        for rel in relationships:
+            tree_html += f'  🔗 {rel.get("from_table","")} → {rel.get("to_table","")} ({rel.get("via","")})\n'
+        tree_html += "</div>"
+    st.markdown(tree_html, unsafe_allow_html=True)
+
+
+def _render_table_card(t: dict, db_path: str = "", can_delete: bool = False, mode_user: str = ""):
+    cols = t["columns"]
+    col_names = ", ".join(cols[:5])
+    if len(cols) > 5:
+        col_names += f" … +{len(cols)-5} more"
+    numeric_cols = None
+    try:
+        conn = sqlite3.connect(db_path)
+        df_sample = pd.read_sql(f'SELECT * FROM "{t["table_name"]}" LIMIT 1', conn)
+        numeric_cols = list(df_sample.select_dtypes(include=["number"]).columns)
+        text_cols = list(df_sample.select_dtypes(exclude=["number"]).columns)
+        conn.close()
+    except Exception:
+        numeric_cols = None
+        text_cols = cols
+
+    with st.container():
+        cols_fmt = col_names
+        c1, c2, c3, c4 = st.columns([2.5, 1, 1, 1])
+        with c1:
+            st.markdown(f'🗂️ **{t["table_name"]}**')
+        with c2:
+            st.markdown(f'`{t["row_count"]} rows`')
+        with c3:
+            with st.popover("📋 Columns", help="View all columns"):
+                for col in cols:
+                    st.code(col)
+        with c4:
+            if can_delete:
+                if st.button("❌", key=f"del_{mode_user}_{t['table_name']}", help="Delete this table"):
+                    drop_table(t["table_name"], username=mode_user)
+                    st.rerun()
+        st.markdown(f'<span style="font-size:12px;color:{_text2};">{cols_fmt}</span>', unsafe_allow_html=True)
+
+        if numeric_cols and len(numeric_cols) >= 2:
+            st.markdown("**Quick Chart:**")
+            qc1, qc2, qc3, qc4 = st.columns(4)
+            x_default = text_cols[0] if text_cols else numeric_cols[0]
+            y_default = numeric_cols[1] if len(numeric_cols) > 1 else numeric_cols[0]
+            chart_key = f"qt_{mode_user}_{t['table_name']}"
+            with qc1:
+                if st.button("📊 Bar", key=f"{chart_key}_bar", use_container_width=True):
+                    fig = _quick_chart(t["table_name"], db_path, "bar", x_default, y_default)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_bar_fig", config={"displaylogo": False})
+            with qc2:
+                if st.button("📈 Line", key=f"{chart_key}_line", use_container_width=True):
+                    fig = _quick_chart(t["table_name"], db_path, "line", x_default, y_default)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_line_fig", config={"displaylogo": False})
+            with qc3:
+                if st.button("🥧 Pie", key=f"{chart_key}_pie", use_container_width=True):
+                    fig = _quick_chart(t["table_name"], db_path, "pie", x_default, y_default)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_pie_fig", config={"displaylogo": False})
+            with qc4:
+                if st.button("🔵 Scatter", key=f"{chart_key}_scatter", use_container_width=True):
+                    fig = _quick_chart(t["table_name"], db_path, "scatter", x_default, y_default)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_scatter_fig", config={"displaylogo": False})
+
+        with st.expander(f"🔍 Preview ({t['table_name']})", expanded=False):
+            try:
+                conn = sqlite3.connect(db_path)
+                df = pd.read_sql(f'SELECT * FROM "{t["table_name"]}" LIMIT 10', conn)
+                conn.close()
+                st.dataframe(df, use_container_width=True, hide_index=True)
+            except Exception as e:
+                st.caption(f"Could not load preview: {e}")
+
+        st.divider()
+
+
 # ── WELCOME SUGGESTIONS ──
 
 @st.cache_data(show_spinner=False)
@@ -730,6 +988,38 @@ with st.sidebar:
     _current_user = st.session_state.user if st.session_state.upload_mode == "personal" else ""
     _upload_label = f" ({st.session_state.user})" if _current_user else " (shared)"
 
+    with st.expander("💬 Chat Sessions", expanded=False):
+        if st.session_state.user:
+            u = st.session_state.user
+            chats = _list_chats(u)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("➕ New Chat", use_container_width=True):
+                    _save_chat(u)
+                    _new_chat(u)
+                    st.rerun()
+            with c2:
+                if st.button("💾 Save", use_container_width=True):
+                    _save_chat(u)
+                    st.toast("Chat saved")
+            if chats:
+                for ch in chats:
+                    cc1, cc2 = st.columns([4, 1])
+                    with cc1:
+                        title = ch["title"][:22] + ("…" if len(ch["title"]) > 22 else "")
+                        if st.button(f"{title} ({ch['msg_count']} msgs)", key=f"chat_{ch['id']}", use_container_width=True):
+                            _load_chat(u, ch["id"])
+                            st.rerun()
+                    with cc2:
+                        if st.button("🗑️", key=f"delchat_{ch['id']}", help="Delete"):
+                            _delete_chat(u, ch["id"])
+                            st.rerun()
+            else:
+                st.caption("No saved chats.")
+            _save_chat(u)
+        else:
+            st.caption("Login to save chats.")
+
     st.divider()
 
     with st.expander("🔍 Agent Trace", expanded=True):
@@ -828,7 +1118,9 @@ with st.sidebar:
                 r = csv_to_table(tmp.name, tbl, username=_current_user)
                 os.unlink(tmp.name)
                 if r["success"]:
-                    st.success(f"Imported {r['row_count']} rows! Now ask: 'Show me first 10 rows from my.{tbl}'")
+                    st.success(f"Imported {r['row_count']} rows!")
+                    _show_data_preview(_current_user, tbl)
+                    st.info("Now ask: 'Show me first 10 rows from my.{tbl}' or click chart presets in My Data tab")
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
@@ -847,7 +1139,9 @@ with st.sidebar:
                 r = excel_to_table(tmp.name, tbl, sheet_name=sheet, username=_current_user)
                 os.unlink(tmp.name)
                 if r["success"]:
-                    st.success(f"Imported {r['row_count']} rows from sheet '{r['sheet']}'! Ask: 'Show me from my.{tbl}'")
+                    st.success(f"Imported {r['row_count']} rows from sheet '{r['sheet']}'!")
+                    _show_data_preview(_current_user, tbl)
+                    st.info("Now ask: 'Show me from my.{tbl}' or click chart presets in My Data tab")
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
@@ -1023,9 +1317,34 @@ with tab_chat:
                     f'<span class="content-label sql">🔍 SQL Queries</span></div>',
                     unsafe_allow_html=True,
                 )
-                for qinfo in sql_qs:
+                for qi, qinfo in enumerate(sql_qs):
+                    sql_key = f"his_sql_{idx}_{qi}"
                     st.code(qinfo["sql"], language="sql")
-                    st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
+                    col_s1, col_s2, col_s3 = st.columns([1, 1, 2])
+                    with col_s1:
+                        st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
+                    with col_s2:
+                        if st.button("✏️ Edit", key=f"{sql_key}_edit", use_container_width=True):
+                            st.session_state[f"{sql_key}_editing"] = not st.session_state.get(f"{sql_key}_editing", False)
+                    with col_s3:
+                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", use_container_width=True):
+                            st.session_state[f"{sql_key}_explain"] = True
+                    if st.session_state.get(f"{sql_key}_editing"):
+                        new_sql = st.text_area("Edit SQL", value=qinfo["sql"], key=f"{sql_key}_ta", height=100)
+                        if st.button("▶️ Run", key=f"{sql_key}_run", use_container_width=True):
+                            r = execute_query(_db_path, new_sql)
+                            if r.get("success"):
+                                st.success(f"{r['row_count']} rows returned")
+                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), use_container_width=True, hide_index=True)
+                            else:
+                                st.error(r.get("error", "Query failed."))
+                    if st.session_state.get(f"{sql_key}_explain"):
+                        with st.spinner("Explaining..."):
+                            explanation = _explain_sql(qinfo["sql"])
+                        st.info(explanation)
+                        if st.button("Hide", key=f"{sql_key}_hide_expl"):
+                            st.session_state[f"{sql_key}_explain"] = False
+                    st.markdown("<hr style='margin:0.25rem 0;opacity:0.2;'>", unsafe_allow_html=True)
 
             for i, fig_dict in enumerate(msg.get("charts", [])):
                 st.markdown(
@@ -1234,9 +1553,34 @@ with tab_chat:
                 dc = last_q.get("columns", [])
 
             if sql_list and st.session_state.show_sql:
-                for qinfo in sql_list:
+                for qi, qinfo in enumerate(sql_list):
+                    sql_key = f"new_sql_{qi}"
                     st.code(qinfo["sql"], language="sql")
-                    st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
+                    col_s1, col_s2, col_s3 = st.columns([1, 1, 2])
+                    with col_s1:
+                        st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
+                    with col_s2:
+                        if st.button("✏️ Edit", key=f"{sql_key}_edit", use_container_width=True):
+                            st.session_state[f"{sql_key}_editing"] = not st.session_state.get(f"{sql_key}_editing", False)
+                    with col_s3:
+                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", use_container_width=True):
+                            st.session_state[f"{sql_key}_explain"] = True
+                    if st.session_state.get(f"{sql_key}_editing"):
+                        new_sql = st.text_area("Edit SQL", value=qinfo["sql"], key=f"{sql_key}_ta", height=100)
+                        if st.button("▶️ Run", key=f"{sql_key}_run", use_container_width=True):
+                            r = execute_query(_db_path, new_sql)
+                            if r.get("success"):
+                                st.success(f"{r['row_count']} rows returned")
+                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), use_container_width=True, hide_index=True)
+                            else:
+                                st.error(r.get("error", "Query failed."))
+                    if st.session_state.get(f"{sql_key}_explain"):
+                        with st.spinner("Explaining..."):
+                            explanation = _explain_sql(qinfo["sql"])
+                        st.info(explanation)
+                        if st.button("Hide", key=f"{sql_key}_hide_expl"):
+                            st.session_state[f"{sql_key}_explain"] = False
+                    st.markdown("<hr style='margin:0.25rem 0;opacity:0.2;'>", unsafe_allow_html=True)
 
             for i, fig_dict in enumerate(result.get("charts", [])):
                 fig = go.Figure(fig_dict)
@@ -1284,6 +1628,11 @@ with tab_chat:
                 "data_cols": dc,
             }
             st.session_state.messages.append(payload)
+            _save_chat(st.session_state.user)
+            if st.session_state.get("_current_chat_title", "Untitled") == "Untitled" and len(st.session_state.messages) > 1:
+                first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "")
+                if first_user_msg:
+                    st.session_state._current_chat_title = first_user_msg[:40]
 
 
 # ══════════════════════════════ MY DATA ═════════════════════════════════
@@ -1332,7 +1681,8 @@ with tab_data:
             try:
                 s = get_schema(db_path=sample_path)
                 if s.get("success"):
-                    all_sources.append(("📦 Sample E-Commerce DB", sample_path, s["tables"], False))
+                    st.markdown(f'<div class="glass" style="padding:0.5rem 1rem;margin-bottom:0.5rem;">📦 <strong>Sample E-Commerce DB</strong> <span style="color:{_text2};font-size:12px;">— {_db_path}</span></div>', unsafe_allow_html=True)
+                    _render_schema_tree(s["schema"]["tables"], s["schema"].get("relationships", []), db_path=sample_path)
             except Exception:
                 pass
 
@@ -1341,43 +1691,24 @@ with tab_data:
             if info.get("success") and info["tables"]:
                 from tools.query_tool import _uploads_db as _get_up_db
                 up_path = _get_up_db(mode_username)
-                all_sources.append((label, up_path, info["tables"], mode_username != ""))
-
-        if not all_sources:
-            st.info("No databases found. Upload a CSV or SQLite file to get started.")
-        else:
-            for src_name, src_path, tables, can_delete in all_sources:
-                mode_user = st.session_state.user if "My Uploads" in src_name else ""
-                col_title, col_clear = st.columns([3, 1])
-                with col_title:
-                    st.markdown(f'<h4 style="color:{_accent};">{src_name}</h4>', unsafe_allow_html=True)
-                    st.code(src_path, language="text")
-                with col_clear:
-                    if can_delete and st.button(f"🗑️ Clear All", key=f"clear_{mode_user}", use_container_width=True):
+                can_del = mode_username != ""
+                st.markdown(f'<div class="glass" style="padding:0.5rem 1rem;margin-bottom:0.5rem;">{label} <span style="color:{_text2};font-size:12px;">— {up_path}</span></div>', unsafe_allow_html=True)
+                mode_user = mode_username
+                for t in info["tables"]:
+                    _render_table_card(t, db_path=up_path, can_delete=can_del, mode_user=mode_user)
+                if can_del:
+                    if st.button(f"🗑️ Clear All — {mode_user}", key=f"clear_{mode_user}", use_container_width=True):
                         clear_uploads(username=mode_user)
                         st.session_state.auto_insights = None
                         st.rerun()
+                st.divider()
 
-                for t in tables:
-                    cols_fmt = ", ".join(t["columns"][:5])
-                    if len(t["columns"]) > 5:
-                        cols_fmt += f" … +{len(t['columns'])-5} more"
-                    c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
-                    with c1:
-                        st.markdown(f'**{t["table_name"]}**')
-                    with c2:
-                        st.markdown(f'`{t["row_count"]} rows`')
-                    with c3:
-                        with st.popover("📋 Columns", help="View columns"):
-                            for col in t["columns"]:
-                                st.code(col)
-                    with c4:
-                        if can_delete:
-                            if st.button("❌", key=f"del_{mode_user}_{t['table_name']}", help="Delete this table"):
-                                drop_table(t["table_name"], username=mode_user)
-                                st.rerun()
-                    st.markdown(f'<span style="font-size:12px;color:{_text2};">{cols_fmt}</span>', unsafe_allow_html=True)
-                    st.divider()
+    if not any([
+        os.path.exists(sample_path),
+        list_uploaded_tables(username=st.session_state.user).get("success") and list_uploaded_tables(username=st.session_state.user)["tables"],
+        list_uploaded_tables(username="").get("success") and list_uploaded_tables(username="")["tables"],
+    ]):
+        st.info("No databases found. Upload a CSV or SQLite file to get started.")
 
 # ══════════════════════════════ DASHBOARD ════════════════════════════════
 

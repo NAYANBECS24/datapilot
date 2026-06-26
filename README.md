@@ -54,6 +54,14 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | Collaborative share | ✅ Copy conversation to clipboard |
 | Docker support | ✅ Dockerfile + docker-compose.yml |
 | Unit tests | ✅ 85 tests, all passing |
+| **GitHub Actions CI** | ✅ Auto-runs tests on every push |
+| **Chat Persistence** | ✅ Auto-saves every conversation to disk |
+| **Multi-Chat Sessions** | ✅ New/switch/delete conversations from sidebar |
+| **SQL Editor Mode** | ✅ Edit any generated SQL and re-run instantly |
+| **SQL Explain** | ✅ LLM explains any SQL query in plain English |
+| **Data Preview on Upload** | ✅ Preview first 5 rows after CSV/Excel import |
+| **Schema Visual Browser** | ✅ Tree view with tables, columns, keys, relationships |
+| **One-Click Chart Presets** | ✅ Bar/Line/Pie/Scatter buttons for every table in My Data |
 
 ---
 
@@ -242,7 +250,19 @@ The **My Data** tab (2nd tab) shows every available data source in one place:
 - **My Uploads** — your personal CSV/DB uploads
 - **Shared Uploads** — team-accessible common data
 
-Each table shows: name, row count, column list (expandable via popover), and file path.
+Each table shows: name, row count, column tree, and file path. Plus:
+
+### Schema Visual Browser
+
+A visual tree lists each database with its tables, columns, primary keys, and foreign-key relationships — no raw SQL needed to understand your data.
+
+### One-Click Chart Presets
+
+Every table has quick chart buttons (Bar, Line, Pie, Scatter). Click to instantly render a Plotly chart with auto-selected X/Y columns — no chat required.
+
+### Inline Preview
+
+Each table has a collapsible preview showing the first 10 rows. Click "🔍 Preview" to inspect data without leaving the tab.
 
 ---
 
@@ -256,6 +276,32 @@ Toggle **"Ask from Uploaded File"** in the sidebar to switch the agent into file
 - The system prompt dynamically changes to guide the agent's focus
 
 ---
+
+## SQL Editor Mode
+
+Every generated SQL query has an **✏️ Edit** button. Click it to open a text editor with the SQL pre-filled — modify, then click **▶️ Run** to execute immediately. The result renders in a DataFrame below the editor. Perfect for power users who want to tweak queries.
+
+## SQL Explain
+
+Every SQL query also has a **💡 Explain SQL** button. Click to get a plain-English explanation from the LLM — great for learning SQL or understanding complex joins.
+
+## Chat Persistence
+
+Every conversation is **auto-saved** to disk after each turn. Your chats survive page refreshes and browser restarts.
+
+### Multi-Chat Sessions
+
+The sidebar's **Chat Sessions** panel lets you:
+- **➕ New Chat** — start fresh while preserving history
+- **💾 Save** — manually save at any point
+- Click any saved chat to load it (title + message count shown)
+- **🗑️** — delete old sessions
+
+Chats are named automatically from the first user message.
+
+## Data Preview on Upload
+
+After importing a CSV or Excel file, DataPilot shows the first **5 rows** as an inline DataFrame preview — instantly confirms the data landed correctly.
 
 ## Smart Query Suggestions
 
