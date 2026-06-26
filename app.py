@@ -925,11 +925,15 @@ with tab_chat:
                 file_name="chat.md", mime="text/markdown", use_container_width=True,
             )
         with e2:
-            pdf_bytes = _generate_pdf_report(st.session_state.messages)
-            st.download_button(
-                "📕 PDF Report", data=pdf_bytes,
-                file_name="datapilot_report.pdf", mime="application/pdf", use_container_width=True,
-            )
+            try:
+                pdf_bytes = _generate_pdf_report(st.session_state.messages)
+                if pdf_bytes:
+                    st.download_button(
+                        "📕 PDF Report", data=pdf_bytes,
+                        file_name="datapilot_report.pdf", mime="application/pdf", use_container_width=True,
+                    )
+            except Exception:
+                st.button("📕 PDF", disabled=True, use_container_width=True)
 
     # ── SUGGESTION PILLS (compact, shown when chatting) ──
     if has_msgs:
