@@ -62,6 +62,8 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | **Data Preview on Upload** | ✅ Preview first 5 rows after CSV/Excel import |
 | **Schema Visual Browser** | ✅ Tree view with tables, columns, keys, relationships |
 | **One-Click Chart Presets** | ✅ Bar/Line/Pie/Scatter buttons for every table in My Data |
+| **RAG — Document Search** | ✅ Upload PDF/TXT/MD → agent searches with vector embeddings (ChromaDB) |
+| **Documents Tab** | ✅ Browse indexed docs, view chunks, per-document delete |
 
 ---
 
@@ -276,6 +278,23 @@ Toggle **"Ask from Uploaded File"** in the sidebar to switch the agent into file
 - The system prompt dynamically changes to guide the agent's focus
 
 ---
+
+## RAG — Document Search (Retrieval-Augmented Generation)
+
+DataPilot can now search **unstructured documents** (PDF, TXT, Markdown) using vector embeddings.
+
+**How it works:**
+1. Upload a PDF/TXT/MD file via **Sidebar → Upload Document**
+2. The text is chunked (600 chars, 80 char overlap) and embedded using `all-MiniLM-L6-v2` via ChromaDB
+3. The agent's `retrieve_context` tool searches the vector store for relevant passages
+4. Results are grounded in your documents — the agent cites source filenames
+
+**Example queries:**
+- *"What does the Q3 report say about revenue growth?"*
+- *"Summarize the key findings from the annual report"*
+- *"Show sales data from the database and compare with the forecast in the PDF"*
+
+**Technical stack:** ChromaDB (PersistentClient) + ONNX all-MiniLM-L6-v2 embeddings — all local, no external API needed. Stored per-user at `uploads/{username}/rag/chroma/`.
 
 ## SQL Editor Mode
 
