@@ -488,8 +488,20 @@ def _get_font_path() -> str:
     cached = os.path.join(cache_dir, "DejaVuSans.ttf")
     if not os.path.exists(cached):
         import urllib.request
-        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-        urllib.request.urlretrieve(url, cached)
+        urls = [
+            "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans.ttf",
+            "https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts@master/ttf/DejaVuSans.ttf",
+        ]
+        downloaded = False
+        for url in urls:
+            try:
+                urllib.request.urlretrieve(url, cached)
+                downloaded = True
+                break
+            except Exception:
+                continue
+        if not downloaded:
+            return None
     return cached
 
 
@@ -497,12 +509,16 @@ def _generate_pdf_report(messages: list) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     font_path = _get_font_path()
-    pdf.add_font("DejaVu", "", font_path, uni=True)
-    pdf.set_font("DejaVu", "", 16)
+    if font_path:
+        pdf.add_font("DejaVu", "", font_path, uni=True)
+        pdf.set_font("DejaVu", "", 16)
+    else:
+        pdf.set_font("Helvetica", "", 16)
     pdf.set_text_color(0, 212, 170)
     pdf.cell(0, 12, "DataPilot - Conversation Report", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(200, 200, 200)
-    pdf.set_font("DejaVu", "", 8)
+    _fnt = "DejaVu" if font_path else "Helvetica"
+    pdf.set_font(_fnt, "", 8)
     pdf.cell(0, 6, f"Generated {datetime.now().strftime('%b %d, %Y at %I:%M %p')}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(6)
 
@@ -510,12 +526,12 @@ def _generate_pdf_report(messages: list) -> bytes:
         if m["role"] == "user":
             pdf.set_fill_color(0, 212, 170)
             pdf.set_text_color(0, 0, 0)
-            pdf.set_font("DejaVu", "", 11)
+            pdf.set_font(_fnt, "", 11)
             pdf.multi_cell(0, 7, f"You: {m.get('content', '')}", fill=True)
         else:
             pdf.set_fill_color(20, 22, 36)
             pdf.set_text_color(220, 220, 220)
-            pdf.set_font("DejaVu", "", 11)
+            pdf.set_font(_fnt, "", 11)
             reply = m.get("reply", "")
             pdf.multi_cell(0, 7, f"DataPilot: {reply}", fill=True)
             for q in m.get("sql_queries", []):
