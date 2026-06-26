@@ -34,7 +34,8 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | Data Profiler tab | ✅ Column analysis, null counts, stats per table |
 | Auto Insights tab | ✅ One-click revenue/trends report |
 | Upload CSV | ✅ Import any CSV as a queryable table |
-| Upload CSV | ✅ **Primary method.** Export from Excel/Sheets → upload → query immediately |
+| Upload CSV | ✅ Primary method. Export from Excel/Sheets → upload → query immediately |
+| Upload Excel (.xlsx/.xls) | ✅ Direct upload — no conversion needed |
 | Upload SQLite DB | ✅ Only if you have a `.db` file |
 | **Login & Register Portal** | ✅ Multi-user auth with password hashing |
 | **Per-User Data Isolation** | ✅ Each user has private uploads |

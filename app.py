@@ -14,7 +14,7 @@ from fpdf import FPDF
 from agent import LANGUAGES, run_agent_turn, get_llm_status
 from trace.tracer import AgentTracer
 from tools.insight_tool import detect_anomalies, generate_auto_insights
-from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads, import_db_file, drop_table, list_uploaded_files, _uploads_dir
+from tools.query_tool import execute_query, csv_to_table, excel_to_table, list_uploaded_tables, clear_uploads, import_db_file, drop_table, list_uploaded_files, _uploads_dir
 from tools.schema_tool import get_schema
 from tools.db_manager import DatabaseManager, validate_query
 from auth.auth import register, login, get_user
@@ -833,8 +833,27 @@ with st.sidebar:
                 else:
                     st.error(r["error"])
 
+    with st.expander("📗 Upload Excel" + _upload_label, expanded=False):
+        st.caption("Upload `.xlsx` / `.xls` — each sheet becomes a table.")
+        uploaded_xl = st.file_uploader("Choose Excel file", type=["xlsx", "xls"], label_visibility="collapsed", key="xl_upload")
+        if uploaded_xl:
+            tbl = st.text_input("Table name", value=uploaded_xl.name.replace(".xlsx", "").replace(".xls", "").replace(" ", "_").lower())
+            sheet = st.text_input("Sheet name (leave blank for first sheet)", value="")
+            if st.button("Import Excel", use_container_width=True):
+                import tempfile
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                tmp.write(uploaded_xl.getbuffer())
+                tmp.close()
+                r = excel_to_table(tmp.name, tbl, sheet_name=sheet, username=_current_user)
+                os.unlink(tmp.name)
+                if r["success"]:
+                    st.success(f"Imported {r['row_count']} rows from sheet '{r['sheet']}'! Ask: 'Show me from my.{tbl}'")
+                    st.session_state.auto_insights = None
+                else:
+                    st.error(r["error"])
+
     with st.expander("🗄️ Upload SQLite DB" + _upload_label, expanded=False):
-        st.caption("Only if you have a `.db` file. Most users just use CSV above.")
+        st.caption("Only if you have a `.db` file. Most users use CSV or Excel above.")
         uploaded_db = st.file_uploader("Choose .db file", type=["db", "sqlite", "sqlite3"], label_visibility="collapsed", key="db_upload")
         if uploaded_db:
             label = st.text_input("Label (optional)", value=uploaded_db.name.replace(".db", "").replace(".sqlite", "").replace(" ", "_").lower())
@@ -1278,36 +1297,31 @@ with tab_data:
         st.markdown("""
         ### No database? No problem.
 
-        **Just upload a CSV file.** That's all you need.
+        **Upload any of these file types** and query them with natural language.
 
-        #### How it works
+        #### Supported File Types
 
-        | Step | What to do |
-        |---|---|
-        | **1.** Export your data as CSV | From Excel: `File → Save As → CSV`<br>From Google Sheets: `File → Download → CSV` |
-        | **2.** Upload it | Sidebar → **Upload CSV** → choose file → name it → Import |
-        | **3.** Ask questions | Type `"Show me first 10 rows from my.{your_table_name}"` in chat |
+        | Format | How to Upload | Example Query |
+        |---|---|---|
+        | **CSV** (.csv) | Sidebar → **Upload CSV** → name it → Import | *"Show me top 10 from my.sales"* |
+        | **Excel** (.xlsx / .xls) | Sidebar → **Upload Excel** → name it → sheet (optional) → Import | *"What's the average in my.budget?"* |
+        | **SQLite DB** (.db / .sqlite) | Sidebar → **Upload SQLite DB** → label → Import | *"List tables in my uploads"* |
 
-        #### Example
+        #### Quick Start (Excel users)
 
-        If you upload `sales_2026.csv` and name it `sales_data`:
-        - ✅ *"Show me first 10 rows from my.sales_data"*
-        - ✅ *"What's the total revenue in my.sales_data?"*
-        - ✅ *"Draw a bar chart of sales by month from my.sales_data"*
+        1. Open your Excel file
+        2. **Sidebar → Upload Excel** → select file
+        3. Give it a name (e.g. `sales_data`)
+        4. Click Import
+        5. In chat, type: *"Show me first 10 rows from my.sales_data"*
 
-        #### Other formats (if you have them)
-
-        | Format | How |
-        |---|---|
-        | **SQLite DB** (.db/.sqlite) | Sidebar → Upload SQLite DB |
-        | **Excel** (.xlsx) | Save As CSV first, then upload CSV |
-        | **JSON** (.json) | Convert to CSV or use via connection string |
-        | **PostgreSQL/MySQL** | Paste connection string in Settings |
+        That's it. No database setup, no SQL to write.
 
         #### Tips
         - **Personal mode** → only you see your uploads
         - **Shared mode** → all team members see them
         - Toggle **"Ask from Uploaded File"** → agent focuses only on your data
+        - Max file size: ~200MB (Streamlit Cloud limit)
         """)
 
     with tab_overview:

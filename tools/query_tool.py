@@ -72,6 +72,22 @@ def _sqlite_execute(db_path: str, sql: str) -> Dict[str, Any]:
         return {"success": False, "sql": sql, "error": str(e)}
 
 
+def excel_to_table(file_path: str, table_name: str, sheet_name: str = "", username: str = "") -> Dict[str, Any]:
+    try:
+        db_path = _uploads_db(username)
+        df = pd.read_excel(file_path, sheet_name=sheet_name) if sheet_name else pd.read_excel(file_path)
+        if df.empty:
+            return {"success": False, "error": "Excel sheet is empty."}
+        conn = sqlite3.connect(db_path)
+        df.to_sql(table_name, conn, if_exists="replace", index=False)
+        conn.close()
+        return {"success": True, "table_name": table_name, "columns": list(df.columns), "row_count": len(df), "sheet": sheet_name or "auto"}
+    except ImportError:
+        return {"success": False, "error": "openpyxl not installed. Run: pip install openpyxl"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def csv_to_table(file_path: str, table_name: str, username: str = "") -> Dict[str, Any]:
     try:
         db_path = _uploads_db(username)
