@@ -6,111 +6,61 @@
 
 Chat in plain English → agent writes & runs SQL → renders charts/diagrams → explains insights. Built with self-healing SQL, real-time streaming, transparent agent traces, glassmorphism UI, and a living pinned dashboard.
 
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
+[![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)](https://github.com/NAYANBECS24/datapilot)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 ---
 
 ## Features
 
-| Feature | Status |
-|---|---|
-| Real-time streaming responses | ✅ Word-level animation via `st.write_stream()` |
-| Self-healing SQL retry loop | ✅ Failed queries auto-fix via LLM (3 attempts) |
-| Live Agent Trace sidebar | ✅ Every tool call with latency — proves the agent is really working |
-| Schema-grounded ER diagrams | ✅ Deterministic from real foreign keys |
-| Decision tree diagrams | ✅ Branching decision trees for conditional logic |
-| Process flow diagrams | ✅ Order-to-delivery pipelines |
-| Pin-to-Dashboard builder | ✅ Any chart → pin → persistent BI dashboard |
-| Smart chart recommendation | ✅ Auto-detects time-series, proportions, categories |
-| 4 chart types | ✅ Bar, line, pie, scatter (bonus) |
-| Glass-box SQL transparency | ✅ Every generated SQL shown in collapsible panel |
-| Export charts as PNG / data as CSV | ✅ One-click download under every chart |
-| PDF report export | ✅ Full conversation exported as PDF |
-| Data Whisperer anomaly scan | ✅ Statistical z-score scan flags outliers |
-| Query history & favorites | ✅ Scrollable history + star to save |
-| Multi-DB support | ✅ SQLite, PostgreSQL, MySQL, **MongoDB** (bonus) |
-| Voice input | ✅ Browser Speech Recognition |
-| Read-only SQL guardrail | ✅ Blocks INSERT/UPDATE/DELETE/DROP |
-| Glassmorphism UI | ✅ Premium dark/light glass design |
-| Multi-language chat | ✅ English, Hindi, Spanish, French, German |
-| Data Profiler tab | ✅ Column analysis, null counts, stats per table |
-| Auto Insights tab | ✅ One-click revenue/trends report |
-| Upload CSV | ✅ Import any CSV as a queryable table |
-| Upload CSV | ✅ Primary method. Export from Excel/Sheets → upload → query immediately |
-| Upload Excel (.xlsx/.xls) | ✅ Direct upload — no conversion needed |
-| Upload SQLite DB | ✅ Only if you have a `.db` file |
-| **Login & Register Portal** | ✅ Multi-user auth with password hashing |
-| **Per-User Data Isolation** | ✅ Each user has private uploads |
-| **Shared Database** | ✅ Team-accessible common upload area |
-| **Ask from Uploaded File Mode** | ✅ Agent focuses only on your uploaded data |
-| **My Data Tab** | ✅ Browse all tables, row counts, columns |
-| **Smart Query Suggestions** | ✅ Dynamic schema-aware suggestions on empty chat |
-| **Data Quality Scanner** | ✅ Null, duplicate, and outlier detection per table |
-| **Predictive Forecasting** | ✅ Trend-based forecast (next N periods) from query results |
-| **Comparative Analysis** | ✅ Side-by-side segment comparison with % change |
-| **Data Storytelling Reports** | ✅ Narrative report combining metrics + insights |
-| **Clarifying Questions** | ✅ Agent asks when query is ambiguous |
-| **Multi-Hop Context** | ✅ Understands "them", "those", "that" across turns |
-| **Cross-DB Joins** | ✅ Query across sample DB + uploads in one SQL |
-| Dashboard HTML export | ✅ Download full dashboard as HTML |
-| Collaborative share | ✅ Copy conversation to clipboard |
-| Docker support | ✅ Dockerfile + docker-compose.yml |
-| Unit tests | ✅ 85 tests, all passing |
-| **GitHub Actions CI** | ✅ Auto-runs tests on every push |
-| **Chat Persistence** | ✅ Auto-saves every conversation to disk |
-| **Multi-Chat Sessions** | ✅ New/switch/delete conversations from sidebar |
-| **SQL Editor Mode** | ✅ Edit any generated SQL and re-run instantly |
-| **SQL Explain** | ✅ LLM explains any SQL query in plain English |
-| **Data Preview on Upload** | ✅ Preview first 5 rows after CSV/Excel import |
-| **Schema Visual Browser** | ✅ Tree view with tables, columns, keys, relationships |
-| **One-Click Chart Presets** | ✅ Bar/Line/Pie/Scatter buttons for every table in My Data |
-| **RAG — Document Search** | ✅ Upload PDF/TXT/MD → agent searches with vector embeddings (ChromaDB) |
-| **Documents Tab** | ✅ Browse indexed docs, view chunks, per-document delete |
-| **ML Forecasting** | ✅ Train LinearRegression on any table — forecast with 95% CI (scikit-learn) |
-| **Geographic Maps** | ✅ Choropleth (country/state) + scatter_mapbox (lat/lon) via Plotly |
-| **NL Dashboard Builder** | ✅ Describe a dashboard → auto-plans 2–4 charts → renders in 2-column grid |
-
----
-
-## Architecture
-
-```
-User → Login / Register
-       │
-       ▼
-┌──────────────────────────┐   tool calls    ┌──────────────────────────┐
-│   Streamlit UI (app.py)   │ ◄─────────────  │   Agent (agent.py)       │
-│                           │                 │                          │
-│  ┌────────────────────┐   │                 │  ┌────────────────────┐  │
-│  │ Chat tab           │   │                 │  │ get_schema         │  │
-│  │ My Data tab        │   │                 │  │ execute_query      │  │
-│  │ Dashboard tab      │   │                 │  │ generate_chart     │  │
-│  │ Profiler tab       │   │                 │  │ generate_flowchart  │  │
-│  │ Insights tab       │   │                 │  │ explain_data       │  │
-│  │ Sidebar: trace,    │   │                 │  └────────────────────┘  │
-│  │ upload, modes      │   │                 │                          │
-│  └────────────────────┘   │                 │  Self-healing retry      │
-└──────────────────────────┘                  │  User-aware context      │
-       │                                      │  (personal/shared/file)  │
-       │ Auth: users.db (password hashing)    │                          │
-       │ Uploads: uploads/{user}/ or shared/  └──────────────────────────┘
-       │ Mermaid/Plotly/PDF/CSV export                          │
-       └─────────────────────────────────────────────────────────┘
-                                                                  │
-                                                                  ▼
-                         ┌────────────────────────────────────────────┐
-                         │  Database Layer                            │
-                         │  SQLite (sample) │ Uploads/{user} │ Shared │
-                         │  PostgreSQL │ MySQL │ MongoDB              │
-                         └────────────────────────────────────────────┘
-```
-
-### Layer breakdown
-- **Auth:** `auth/auth.py` — password hashing (SHA-256), user registration/login, per-user upload directories
-- **Frontend:** `app.py` — Streamlit with 7 tabs (Chat, My Data, Dashboard, Profiler, Auto Insights, Documents, Dashboards), sidebar trace, upload modes, dark/light theme
-- **Orchestration:** `agent.py` — LLM tool-use loop with user-aware context (personal/shared/file mode), self-healing retry, multi-provider
-- **Tools layer:** 10 tool functions in `tools/*.py` — no LLM calls inside them (except dashboard planner)
-- **Database abstraction:** `tools/db_manager.py` — unified interface for SQLite, PostgreSQL, MySQL, MongoDB
-- **Data layer:** SQLite sample e-commerce DB + per-user `uploads/{username}/uploads.db` + shared `uploads/shared/uploads.db`
-- **Observability:** `trace/tracer.py` — dataclass-based logger
+| Category | Feature | Status |
+|---|---|---|
+| **Core** | Natural language → SQL agent | ✅ |
+| | Real-time streaming responses | ✅ Word-level animation via `st.write_stream()` |
+| | Self-healing SQL retry loop | ✅ Failed queries auto-fix via LLM (3 attempts) |
+| | Live Agent Trace sidebar | ✅ Every tool call with latency — proves the agent is really working |
+| | Glass-box SQL transparency | ✅ Every generated SQL shown in collapsible panel |
+| | Chat Persistence & Multi-Chat Sessions | ✅ Auto-saves every conversation, new/load/delete from sidebar |
+| **Charts & Visuals** | 7 chart types | ✅ Bar, line, pie, scatter, choropleth, scatter_mapbox, auto |
+| | Smart chart recommendation | ✅ Auto-detects time-series, proportions, categories, location data |
+| | Geographic Maps | ✅ Choropleth (country/state) + scatter_mapbox (lat/lon) |
+| | Schema-grounded ER diagrams | ✅ Deterministic from real foreign keys |
+| | Decision tree diagrams | ✅ Branching decision trees for conditional logic |
+| | Process flow diagrams | ✅ Order-to-delivery pipelines |
+| **ML & Analytics** | ML Forecasting | ✅ LinearRegression with 95% CI, R² score, standard error |
+| | Predictive Forecasting | ✅ Trend-based forecast (next N periods) via numpy polyfit |
+| | Data Quality Scanner | ✅ Null, duplicate, and outlier (z-score ±2σ) detection per table |
+| | Anomaly Detection | ✅ Statistical z-score scan flags outliers in any series |
+| | Comparative Analysis | ✅ Side-by-side segment comparison with % change |
+| | Data Storytelling Reports | ✅ Narrative combining metrics + insights |
+| **Data Upload** | Upload CSV | ✅ Import any CSV as a queryable table |
+| | Upload Excel (.xlsx/.xls) | ✅ Direct upload — no conversion needed |
+| | Upload SQLite DB | ✅ Import entire `.db` files |
+| | RAG Document Search | ✅ Upload PDF/TXT/MD → ChromaDB vector search (ONNX, no API needed) |
+| | Data Preview on Upload | ✅ Preview first 5 rows after every import |
+| **Auth & Isolation** | Login & Register Portal | ✅ Multi-user auth with SHA-256 password hashing |
+| | Per-User Data Isolation | ✅ Each user has private `uploads/{username}/uploads.db` |
+| | Shared Database mode | ✅ Team-accessible common upload area |
+| | Ask from Uploaded File mode | ✅ Agent focuses only on your uploaded data |
+| **UI/UX** | Dashboard Builder (NL) | ✅ Describe a dashboard → auto-plans 2–4 charts → renders in 2-column grid |
+| | Pin-to-Dashboard | ✅ Any chart → pin → persistent BI dashboard |
+| | Dashboard HTML export | ✅ Download full dashboard as HTML |
+| | Schema Visual Browser | ✅ Tree view with tables, columns, keys, relationships |
+| | One-Click Chart Presets | ✅ Bar/Line/Pie/Scatter buttons for every table in My Data |
+| | Smart Query Suggestions | ✅ Dynamic schema-aware suggestions on empty chat |
+| | SQL Editor Mode | ✅ Edit any generated SQL and re-run instantly |
+| | SQL Explain | ✅ LLM explains any SQL query in plain English |
+| | Export charts as PNG / data as CSV | ✅ One-click download under every chart |
+| | PDF report export | ✅ Full conversation exported as PDF |
+| | Markdown conversation export | ✅ Copy/share conversations |
+| | Glassmorphism UI | ✅ Premium dark/light glass design with animations |
+| | Multi-language chat | ✅ English, Hindi, Spanish, French, German |
+| | Voice input | ✅ Browser Speech Recognition (Chrome, Edge, Safari) |
+| **Infrastructure** | Multi-DB support | ✅ SQLite, PostgreSQL, MySQL, MongoDB |
+| | Read-only SQL guardrail | ✅ Blocks INSERT/UPDATE/DELETE/DROP/ALTER |
+| | GitHub Actions CI | ✅ Auto-runs 85 tests on every push |
+| | Docker support | ✅ Dockerfile + docker-compose.yml |
 
 ---
 
@@ -164,38 +114,88 @@ docker compose up --build
 
 ---
 
+## Architecture
+
+```
+User → Login / Register
+       │
+       ▼
+┌──────────────────────────────┐   tool calls    ┌──────────────────────────────┐
+│   Streamlit UI (app.py)       │ ◄─────────────  │   Agent (agent.py)           │
+│                              │                 │                              │
+│  ┌────────────────────────┐  │                 │  ┌────────────────────────┐  │
+│  │ 💬 Chat                │  │                 │  │ get_schema              │  │
+│  │ 🗂️ My Data              │  │                 │  │ execute_query           │  │
+│  │ 📌 Dashboard (pinned)   │  │                 │  │ generate_chart          │  │
+│  │ 📊 Data Profiler        │  │                 │  │ generate_flowchart      │  │
+│  │ 🤖 Auto Insights        │  │                 │  │ explain_data            │  │
+│  │ 📄 Documents            │  │                 │  │ forecast_data           │  │
+│  │ 📈 Dashboards (NL)      │  │                 │  │ compare_data            │  │
+│  │                        │  │                 │  │ retrieve_context (RAG)  │  │
+│  │ Sidebar:                │  │                 │  │ scan_quality            │  │
+│  │ trace, upload, modes    │  │                 │  │ generate_report         │  │
+│  └────────────────────────┘  │                 │  │ auto_ml_forecast        │  │
+│                              │                 │  │ build_dashboard         │  │
+│  Auth: users.db (SHA-256)    │                 │  └────────────────────────┘  │
+│  Uploads: uploads/{user}/    │                 │                              │
+│  Mermaid / Plotly / PDF/CSV  │                 │  Self-healing retry          │
+└──────────────────────────────┘                 │  User-aware context          │
+        │                                        │  (personal/shared/file)      │
+        └────────────────────────────────────────┴──────────────────────────────┘
+                                                             │
+                                                             ▼
+                        ┌───────────────────────────────────────────────────────┐
+                        │  Database Layer                                       │
+                        │  SQLite (sample_ecommerce.db) │ Uploads/{user}/       │
+                        │  Uploads/shared/ │ PostgreSQL │ MySQL │ MongoDB       │
+                        └───────────────────────────────────────────────────────┘
+```
+
+### Layer breakdown
+- **Auth:** `auth/auth.py` — password hashing (SHA-256), user registration/login, per-user upload directories with login persistence across page reloads
+- **Frontend:** `app.py` — Streamlit with 7 tabs, sidebar trace/logs, upload (CSV/Excel/DB/Docs), multi-chat sessions, file manager, SQL editor, chart presets, theme toggle, voice input
+- **Orchestration:** `agent.py` — LLM tool-use loop with multi-provider support (NVIDIA/OpenAI/Anthropic), streaming, self-healing SQL retry, user-aware context (personal/shared/file mode), clarifying questions, multi-hop reasoning, cross-DB joins
+- **Tools (12):** 12 pure function tools in `tools/*.py` — schema discovery, SQL execution, charting (7 types + auto-recommend), flowcharts (ER/process/decision), insights, forecasting, comparison, data quality scanning, report generation, ML forecasting, RAG document search, dashboard builder
+- **Database abstraction:** `tools/db_manager.py` — unified interface for SQLite, PostgreSQL, MySQL, MongoDB
+- **Data layer:** SQLite sample e-commerce DB (12,456 rows, 9 tables) + per-user `uploads/{username}/uploads.db` + shared `uploads/shared/uploads.db`
+- **Observability:** `trace/tracer.py` — dataclass-based agent trace logger with step/event tracking
+
+---
+
 ## Project Structure
 ```
 datapilot/
-├── app.py                   Streamlit frontend (chat, dashboard, profiler, insights)
-├── agent.py                 LLM orchestration with streaming + multi-provider
+├── app.py                   Streamlit UI (7 tabs, sidebar, auth gate, uploads)
+├── agent.py                 LLM orchestration (tool loop, streaming, retry, 12 tools)
+├── .streamlit/
+│   ├── config.toml
+│   └── secrets.toml.example
 ├── auth/
 │   ├── __init__.py
-│   └── auth.py              Login/register, password hashing, user management
-├── .streamlit/
-│   ├── config.toml          Streamlit Cloud server config
-│   └── secrets.toml.example Template for cloud secrets
+│   └── auth.py              Login/register with SHA-256, auto-seed defaults, per-user dirs
 ├── tools/
+│   ├── __init__.py
 │   ├── db_manager.py        Multi-DB abstraction (SQLite/PostgreSQL/MySQL/MongoDB)
-│   ├── schema_tool.py       get_schema — table/column/FK discovery + upload merging
-│   ├── query_tool.py        execute_query + validate_query + CSV/DB upload + per-user paths
-│   ├── chart_tool.py        generate_chart — bar/line/pie/scatter/auto
-│   ├── flowchart_tool.py    generate_flowchart — ER diagram + process flow + decision tree
+│   ├── schema_tool.py       Schema discovery — tables, columns, FKs + upload merging
+│   ├── query_tool.py        SQL execution, validation, CSV/Excel/DB upload, per-user paths
+│   ├── chart_tool.py        generate_chart — bar/line/pie/scatter/choropleth/scatter_mapbox/auto
+│   ├── flowchart_tool.py    generate_flowchart — ER/process-flow/decision-tree diagrams
 │   ├── insight_tool.py      explain_data + detect_anomalies + generate_auto_insights
-│   ├── analytics_tool.py    generate_forecast + compare_segments
-│   ├── quality_tool.py      scan_quality — nulls/duplicates/outliers
+│   ├── analytics_tool.py    generate_forecast (polyfit) + compare_segments
+│   ├── quality_tool.py      scan_quality — nulls/duplicates/outliers (±2σ)
 │   ├── report_tool.py       generate_report — data storytelling narrative
-│   ├── ml_tool.py           auto_ml_forecast — LinearRegression with CI
+│   ├── rag_tool.py          upload_document + retrieve_context + list/delete/clear docs
+│   ├── ml_tool.py           auto_ml_forecast — LinearRegression with 95% CI
 │   └── dashboard_tool.py    build_dashboard + plan_dashboard_llm — NL multi-chart builder
 ├── db/
-│   ├── seed_db.py           Sample e-commerce SQLite dataset generator
+│   ├── seed_db.py           Sample e-commerce dataset generator (12,456 rows)
 │   ├── check_db.py          Database validation helper
-│   └── sample_ecommerce.db  Pre-seeded database (12,456 rows, 9 tables)
-├── uploads/                 Per-user and shared upload directories
+│   └── sample_ecommerce.db  Pre-seeded SQLite database (9 tables)
+├── uploads/
 │   ├── shared/              Common upload area (all users)
-│   └── {username}/          Private per-user upload area
+│   └── {username}/          Private per-user upload area (+ rag/ + chats/)
 ├── trace/
-│   └── tracer.py            Agent observability / trace logging
+│   └── tracer.py            Agent observability / trace logging (timed, events)
 ├── tests/
 │   ├── test_chart_tool.py
 │   ├── test_flowchart_tool.py
@@ -215,10 +215,11 @@ Every tool file is independently testable:
 ```bash
 python tools/schema_tool.py      # prints full schema JSON
 python tools/query_tool.py       # tests valid/blocked/broken queries
-python tools/chart_tool.py       # generates sample bar chart
+python tools/chart_tool.py       # generates all 7 chart types
 python tools/flowchart_tool.py   # prints ER + process-flow + decision-tree Mermaid
-python tools/insight_tool.py     # runs anomaly detection on sample data
-python -m pytest tests/ -v       # 85 tests
+python tools/insight_tool.py     # runs anomaly detection + auto insights on sample data
+python tools/ml_tool.py          # trains forecast model on order_items table
+python -m pytest tests/ -v       # 85 tests, all passing
 ```
 
 ---
@@ -227,16 +228,16 @@ python -m pytest tests/ -v       # 85 tests
 
 DataPilot starts with a login/register screen. Users must sign up before accessing the app.
 
-- **Registration:** Username (min 3 chars) + password (min 4 chars), stored with SHA-256 hashing
-- **Login:** Authenticates against `auth/users.db`
-- **Session:** Persists per browser session; logout clears all session state
-- **Footer:** Team name displayed on both login and main pages
+- **Login page:** Full-screen animated CSS wallpaper (gradient background, data grid overlay, chart bars, line chart, floating dots) with glassmorphism card (`backdrop-filter: blur(24px)`)
+- **Registration:** Username (min 3 chars) + password (min 4 chars), stored with SHA-256 hashing in `auth/users.db`
+- **Login persistence:** Username stored in `st.query_params["user"]` — survives page reloads until explicit Logout
+- **Default users:** `admin/admin123` and `nayan/nayan` auto-seeded on fresh deploy
+- **Session:** Logout clears all session state
+- **Footer:** "Team — Parth" displayed on both login and main pages
 
 ---
 
 ## Per-User Data Isolation
-
-Every user gets their own private upload space:
 
 | Upload Mode | Storage Path | Access |
 |---|---|---|
@@ -247,51 +248,91 @@ Toggle between **Personal** and **Shared** mode in the sidebar. The schema tool 
 - Tables prefixed with `my.` → personal uploads
 - Tables prefixed with `uploads.` → shared uploads
 
+User-specific data also includes:
+- RAG vector stores at `uploads/{username}/rag/chroma/`
+- Chat persistence at `uploads/{username}/chats/{chat_id}.json`
+
 ---
 
-## My Data Tab
+## Tabs Overview
 
-The **My Data** tab (2nd tab) shows every available data source in one place:
+### 💬 Chat
+The main interface. Type natural language questions → agent plans tool calls → streams answers word-by-word with real-time chart/diagram rendering. Features:
+- Welcome hero with schema-aware query suggestions
+- Collapsible SQL panels per query (with Edit/Explain buttons)
+- Chart/diagram rendered inline
+- Pin-to-Dashboard for any chart
+- Export: PNG, CSV, Markdown, PDF
+- Query history & favorites sidebar
 
+### 🗂️ My Data
+Schema visual browser showing all data sources:
 - **Sample E-Commerce DB** — 9 tables, 12,456 rows
-- **My Uploads** — your personal CSV/DB uploads
+- **My Uploads** — personal CSV/Excel/DB uploads
 - **Shared Uploads** — team-accessible common data
 
-Each table shows: name, row count, column tree, and file path. Plus:
+Each table shows: row count, column tree with types, primary keys, foreign keys. Features:
+- **🔍 Preview** — collapsible first 10 rows
+- **One-click chart presets** — Bar/Line/Pie/Scatter buttons
+- **❌ Delete** — per-table and "Clear All" buttons
+- **Upload Guide** tab with format reference
 
-### Schema Visual Browser
+### 📌 Dashboard
+Persistent BI dashboard built from pinned charts. Drag/drop reorder, HTML export, full-page print-ready view.
 
-A visual tree lists each database with its tables, columns, primary keys, and foreign-key relationships — no raw SQL needed to understand your data.
+### 📊 Data Profiler
+- **Column Analysis** — type, null count, unique count, min/max/mean per table
+- **Data Quality Scanner** — `scan_quality` checks all tables for nulls, duplicates, outliers
 
-### One-Click Chart Presets
+### 🤖 Auto Insights
+- **Auto Insights** — one-click revenue/trends/anomalies report
+- **Data Storytelling** — focus-area driven narrative report with metrics + insights
 
-Every table has quick chart buttons (Bar, Line, Pie, Scatter). Click to instantly render a Plotly chart with auto-selected X/Y columns — no chat required.
+### 📄 Documents
+Uploaded PDF/TXT/MD file browser with:
+- File listing (name, size KB)
+- **🔍 Chunks** — view first 10 indexed chunks with inline preview
+- Per-document delete + Clear All
 
-### Inline Preview
-
-Each table has a collapsible preview showing the first 10 rows. Click "🔍 Preview" to inspect data without leaving the tab.
+### 📈 Dashboards
+Two AI-powered tools:
+- **ML Forecast** — pick table + numeric column → LinearRegression forecast with 95% CI
+- **NL Dashboard Builder** — describe a dashboard → LLM plans 2–4 charts → renders in 2-column grid
 
 ---
 
-## Ask from Uploaded File Mode
+## Uploading Data
 
-Toggle **"Ask from Uploaded File"** in the sidebar to switch the agent into file-only mode:
+### CSV
+1. **Sidebar → Upload CSV** — select a `.csv` file
+2. Optionally rename the table (defaults to filename)
+3. Table appears in My Data under "My Uploads"
+4. Ask questions in chat — the agent will discover and query it
 
-- The agent ignores the sample e-commerce database
-- It only queries tables from your uploaded data (`my.*` or `uploads.*`)
-- Perfect for: *"Upload your Excel → switch mode → ask questions about it"*
-- The system prompt dynamically changes to guide the agent's focus
+### Excel (.xlsx / .xls)
+Same flow as CSV. Optionally specify a sheet name. Uses openpyxl.
+
+### SQLite Database
+1. **Sidebar → Upload SQLite DB**
+2. Optionally label it
+3. All tables from the database are imported and available
+4. Tables appear with `my.` prefix for personal mode
+
+### Documents (PDF / TXT / MD)
+1. **Sidebar → Upload Document**
+2. Text is chunked (600 chars, 80 overlap) → embedded via ChromaDB ONNX (`all-MiniLM-L6-v2`)
+3. Ask: *"What does the report say about X?"* → agent calls `retrieve_context` → answers with filename citations
 
 ---
 
 ## RAG — Document Search (Retrieval-Augmented Generation)
 
-DataPilot can now search **unstructured documents** (PDF, TXT, Markdown) using vector embeddings.
+DataPilot searches **unstructured documents** using vector embeddings — no external API needed.
 
 **How it works:**
 1. Upload a PDF/TXT/MD file via **Sidebar → Upload Document**
-2. The text is chunked (600 chars, 80 char overlap) and embedded using `all-MiniLM-L6-v2` via ChromaDB
-3. The agent's `retrieve_context` tool searches the vector store for relevant passages
+2. Text is chunked (600 chars, 80 char overlap) and embedded using ChromaDB's built-in ONNX `all-MiniLM-L6-v2`
+3. The agent's `retrieve_context` tool searches the per-user vector store for relevant passages
 4. Results are grounded in your documents — the agent cites source filenames
 
 **Example queries:**
@@ -299,21 +340,21 @@ DataPilot can now search **unstructured documents** (PDF, TXT, Markdown) using v
 - *"Summarize the key findings from the annual report"*
 - *"Show sales data from the database and compare with the forecast in the PDF"*
 
-**Technical stack:** ChromaDB (PersistentClient) + ONNX all-MiniLM-L6-v2 embeddings — all local, no external API needed. Stored per-user at `uploads/{username}/rag/chroma/`.
+---
 
 ## SQL Editor Mode
 
-Every generated SQL query has an **✏️ Edit** button. Click it to open a text editor with the SQL pre-filled — modify, then click **▶️ Run** to execute immediately. The result renders in a DataFrame below the editor. Perfect for power users who want to tweak queries.
+Every generated SQL query has an **✏️ Edit** button. Click to open a text editor with the SQL pre-filled — modify, then click **▶️ Run** to execute immediately. Results render in a DataFrame below the editor.
 
 ## SQL Explain
 
-Every SQL query also has a **💡 Explain SQL** button. Click to get a plain-English explanation from the LLM — great for learning SQL or understanding complex joins.
+Every SQL query also has a **💡 Explain SQL** button. Click for a plain-English explanation from the LLM — great for learning SQL or understanding complex joins.
 
-## Chat Persistence
+---
 
-Every conversation is **auto-saved** to disk after each turn. Your chats survive page refreshes and browser restarts.
+## Chat Persistence & Multi-Chat Sessions
 
-### Multi-Chat Sessions
+Every conversation is **auto-saved** to disk after each turn. Chats survive page refreshes and browser restarts.
 
 The sidebar's **Chat Sessions** panel lets you:
 - **➕ New Chat** — start fresh while preserving history
@@ -321,67 +362,48 @@ The sidebar's **Chat Sessions** panel lets you:
 - Click any saved chat to load it (title + message count shown)
 - **🗑️** — delete old sessions
 
-Chats are named automatically from the first user message.
-
-## Data Preview on Upload
-
-After importing a CSV or Excel file, DataPilot shows the first **5 rows** as an inline DataFrame preview — instantly confirms the data landed correctly.
-
-## Smart Query Suggestions
-
-When the chat is empty, DataPilot reads the actual database schema and generates relevant questions dynamically (e.g., "Show me revenue by Electronics" if the Electronics category exists). Falls back to 8 static examples if the schema read fails.
-
----
-
-## Predictive Forecasting
-
-New tool: `forecast_data` — uses numpy polyfit to predict future values from time-series data.
-
-**Example:** *"Forecast revenue for next 5 months"* → agent queries monthly revenue → calls `forecast_data` → returns projected values with trend direction (up/down/flat).
-
----
-
-## Comparative Analysis
-
-New tool: `compare_data` — compares two query result sets side-by-side with absolute and percent change.
-
-**Example:** *"Compare this quarter's sales to last quarter"* → agent queries both periods → calls `compare_data` → shows total, avg, max, min, top categories for each segment + % change.
+Chats are named automatically from the first user message. Stored at `uploads/{username}/chats/{chat_id}.json`.
 
 ---
 
 ## ML Forecasting
 
-New tool + UI: `auto_ml_forecast` — trains a **LinearRegression** model on any table and numeric column, then forecasts future values with 95% confidence intervals.
+Train a **LinearRegression** model on any table and numeric column, then forecast with 95% confidence intervals.
 
 - Available in the **Dashboards** tab under "ML Forecast"
-- Pick a table, target column, and number of periods
+- Also callable from chat via the `auto_ml_forecast` agent tool
 - Returns: R² score, standard error, forecast table, and interactive Plotly chart with actuals + forecast + CI band
-- Works with scikit-learn (LinearRegression) — install via `pip install scikit-learn`
+- Auto-detects date frequency (daily/weekly/monthly/quarterly/yearly)
+- Uses scikit-learn: `pip install scikit-learn`
 
-**Example:** *"Predict sales for the next 6 months"* → agent calls `auto_ml_forecast(table="orders", target_col="order_id")` → returns forecast plot + metrics.
+**Example:** *"Predict sales for the next 6 months"* → agent calls `auto_ml_forecast` → returns forecast plot + metrics.
 
 ---
 
 ## Geographic Maps
 
-New chart types: **choropleth** (for country/state/region data) and **scatter_mapbox** (for lat/lon data).
+Two new map chart types in the agent's toolkit:
 
-- Auto-detection: if the x-axis column name matches "country", "state", "region", etc., the chart automatically uses choropleth
-- If x is "lat" or "latitude", uses scatter_mapbox with OpenStreetMap tiles
-- Available in chat via `generate_chart` with `chart_type="choropleth"` or `chart_type="scatter_mapbox"`
+| Type | When | Requirements |
+|---|---|---|
+| **Choropleth** | Country/state/region data | Location column → color value |
+| **Scatter mapbox** | Lat/Lon coordinates | Latitude + longitude + optional size |
 
-**Example:** *"Show revenue by country on a map"* → agent queries revenue grouped by country → calls `generate_chart(data, chart_type="choropleth", x="country", y="revenue")`
+- Auto-detected by column name (country, state, region, lat, latitude)
+- OpenStreetMap tiles via Plotly's `carto-positron` style
+- Available in chat via `generate_chart(chart_type="choropleth" | "scatter_mapbox")`
+
+**Example:** *"Show revenue by country on a map"* → agent queries → calls `generate_chart(data, chart_type="choropleth", x="country", y="revenue")`
 
 ---
 
 ## NL Dashboard Builder
 
-New feature: describe a dashboard in natural language and DataPilot plans & renders 2–4 charts in a 2-column grid.
+Describe a dashboard in natural language — DataPilot plans 2–4 diverse charts and renders them in a responsive 2-column grid.
 
-- Available in the **Dashboards** tab under "NL Dashboard Builder"
-- Type a request like *"Show me monthly revenue, revenue by category, top products, and order status"*
-- Backend: `plan_dashboard_llm()` calls the LLM to generate structured chart specs → `build_dashboard()` executes SQL + renders charts
-- Charts are shown in a responsive 2-column grid with auto-sizing
+- Available in the **Dashboards** tab
+- Backend: `plan_dashboard_llm()` → LLM generates structured chart specs → `build_dashboard()` executes SQL + renders Plotly charts
+- Also callable directly from chat via the `build_dashboard` agent tool
 
 **Example prompts:**
 - *"Show me monthly revenue, revenue by category, top products, and order status breakdown"*
@@ -390,76 +412,76 @@ New feature: describe a dashboard in natural language and DataPilot plans & rend
 
 ---
 
-## Data Storytelling Reports
+## Agent Intelligence
 
-New tool + UI: `generate_report` combines summary statistics, top categories, and chart references into a single narrative.
+### Clarifying Questions
+When a query is ambiguous (e.g., *"Show me sales"* without a time period), the agent asks a short clarifying question instead of guessing.
 
-- Available in the **Auto Insights** tab under "Data Storytelling Report"
-- Type a focus area (e.g. "sales performance") → generates a structured story
-- Includes key metrics, insights, and a list of visualizations included
+### Multi-Hop Context
+The agent tracks pronouns across turns. *"Show top customers"* → *"Which are from Mumbai?"* → understands "which" = top customers.
 
----
+### Cross-DB Joins
+The sample DB and uploads DB are SQLite-attached. The agent can write queries that `JOIN` across both — e.g., `SELECT * FROM orders JOIN uploads.my_table`.
 
-## Data Quality Scanner
-
-New tool + UI: `scan_quality` checks every table for:
-
-| Check | What It Finds |
-|---|---|
-| **Null values** | Columns with missing data and counts |
-| **Duplicate rows** | Exact row duplicates |
-| **Outlier values** | Values exceeding ±2σ (z-score) in numeric columns |
-
-Available in the **Data Profiler** tab under "Data Quality Scanner" → click "Scan Quality".
+### Self-Healing SQL
+If `execute_query` returns an error, the agent automatically retries with a corrected SQL query (up to 3 attempts).
 
 ---
 
-## Clarifying Questions, Multi-Hop Context & Cross-DB Joins
+## Smart Query Suggestions
 
-These are built into the agent's system prompt (no separate UI):
-
-- **Clarifying:** *"Show me sales"* → *"Which time period?"* instead of guessing
-- **Multi-Hop:** *"Show top customers"* → *"Which are from Mumbai?"* → understands "which" = top customers
-- **Cross-DB Joins:** The sample DB and uploads DB are SQLite-attached — agent can write `JOIN uploads.my_table` in a single query
+When the chat is empty, DataPilot reads the actual database schema and generates relevant questions dynamically (e.g., "Show me revenue by Electronics" if the Electronics category exists). Falls back to 8 static examples if the schema read fails.
 
 ---
 
 ## Try These Queries
 
-**Sales Analysis**
+### Sales Analysis
 - *"Show me the top 5 products by revenue"*
 - *"What's the average order value per city?"*
 - *"Show me monthly revenue trend for this year"*
 - *"Show me revenue breakdown by product category"*
 
-**Database Understanding**
+### Database Understanding
 - *"Draw me the ER diagram for this database"*
 - *"Which tables are related to customers?"*
 - *"What's the schema of the orders table?"*
 
-**Process & Decision Visualization**
+### Process & Decision Visualization
 - *"Create a flowchart showing how an order moves through our system"*
 - *"Create a decision tree for prioritizing which products to restock based on sales velocity and profit margin"*
 
-**Inventory**
-- *"Show me products with stock below 50 units"*
-- *"Which customers have placed the most orders?"*
-
-**ML Forecasting**
+### ML Forecasting
 - *"Predict revenue for the next 6 months"*
-- *"Forecast order volume"*
+- *"Forecast order volume from order_items"*
 - *"Show me monthly orders and predict next quarter"*
 
-**Geographic Maps**
+### Geographic Maps
 - *"Show me revenue by country on a map"*
-- *"Plot customer cities on a map"*
+- *"Plot customers by city on a map"*
 
-**Dashboards**
+### Dashboards
 - *"Build me a dashboard with monthly revenue, category breakdown, top products, and order status"*
 - *"Show me a sales overview with trends, categories, and customer stats"*
 
-**Anomaly Detection**
+### Anomaly Detection
 - *"Show me daily revenue for last week"* → then click **Data Whisperer** scan in sidebar
+- *"Scan for anomalies in monthly revenue"*
+
+### Inventory
+- *"Show me products with stock below 50 units"*
+- *"Which customers have placed the most orders?"*
+
+### Comparative
+- *"Compare this quarter's sales to last quarter"*
+- *"Compare revenue by category between Q1 and Q2"*
+
+### Data Quality
+- *"Scan the database for data quality issues"*
+
+### Documents (RAG)
+- *"What does the uploaded report say about revenue growth?"*
+- *"Summarize the key findings from the uploaded document"*
 
 ---
 
@@ -469,9 +491,11 @@ These are built into the agent's system prompt (no separate UI):
 |---|---|---|
 | LLM | NVIDIA (default) / OpenAI / Anthropic | Multiple providers via `LLM_PROVIDER` env var |
 | Frontend | Streamlit | Fastest chat UI with chart + streaming support |
-| Charts | Plotly | Interactive, zoom, hover, PNG export |
-| Diagrams | Mermaid.js | ER diagrams, flowcharts, decision trees |
+| Charts | Plotly | Interactive, zoom, hover, PNG export, 7 chart types |
+| Diagrams | Mermaid.js | ER diagrams, process flows, decision trees |
 | Database | SQLite + PostgreSQL + MySQL + MongoDB | Multi-DB via connection string |
+| Embeddings | ChromaDB (ONNX all-MiniLM-L6-v2) | Zero external API calls, fully offline RAG |
+| ML | scikit-learn (LinearRegression) | Simple, fast, interpretable forecasting |
 | PDF | fpdf2 | Conversation report export |
 | Deployment | Docker + Streamlit Cloud | Reproducible + free hosting |
 
@@ -487,8 +511,6 @@ DataPilot streams responses word-by-word for a ChatGPT-like experience:
 ---
 
 ## Multi-Database Support
-
-DataPilot connects to 4 database types simultaneously:
 
 | Type | Connection String |
 |---|---|
@@ -510,7 +532,7 @@ pip install pymongo            # MongoDB support
 
 ## Voice Input
 
-Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak your query — the browser's built-in Speech Recognition will transcribe and submit it automatically. Works in Chrome, Edge, and Safari.
+Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak your query — the browser's built-in Speech Recognition transcribes and submits it automatically. Works in Chrome, Edge, and Safari.
 
 ---
 
@@ -530,9 +552,9 @@ Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak 
 |---|---|---|
 | PNG | Under each chart | ⬇ PNG button |
 | CSV | Under each chart | ⬇ CSV button |
-| Markdown | Chat tab | 📥 Markdown button |
-| PDF | Chat tab | 📕 PDF Report button |
-| HTML | Dashboard tab | 📥 Export HTML button |
+| Markdown | Chat tab | 📥 Markdown copy button |
+| PDF | Chat tab | 📕 PDF Report button (whole conversation) |
+| HTML | Dashboard tab | 📥 Export HTML button (pinned charts) |
 | Profile CSV | Profiler tab | ⬇ Profile CSV button |
 | Insight JSON | Auto Insights tab | ⬇ JSON button |
 
