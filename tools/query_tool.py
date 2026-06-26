@@ -9,8 +9,17 @@ import pandas as pd
 
 from tools.db_manager import DatabaseManager, get_db_manager, validate_query
 
-UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "uploads")
-os.makedirs(UPLOADS_DIR, exist_ok=True)
+_UPLOADS_BASE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+
+
+def _uploads_dir(username: str = "") -> str:
+    d = os.path.join(_UPLOADS_BASE, username.strip().lower()) if username.strip() else os.path.join(_UPLOADS_BASE, "shared")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _uploads_db(username: str = "") -> str:
+    return os.path.join(_uploads_dir(username), "uploads.db")
 
 
 def execute_query(db_path: Optional[str] = None, sql: str = "", conn_str: Optional[str] = None) -> Dict[str, Any]:
@@ -41,10 +50,10 @@ def _sqlite_execute(db_path: str, sql: str) -> Dict[str, Any]:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
 
-        uploads_db = os.path.join(os.path.dirname(db_path), "uploads", "uploads.db") if db_path else ""
+        uploads_db = os.path.join(_UPLOADS_BASE, "shared", "uploads.db") if db_path else ""
         if uploads_db and os.path.exists(uploads_db):
             try:
-                conn.execute(f"ATTACH DATABASE '{uploads_db}' AS uploads")
+                conn.execute(f"ATTACH DATABASE '{uploads_db.replace(chr(39), chr(39)+chr(39))}' AS uploads")
             except Exception:
                 pass
 
@@ -63,9 +72,9 @@ def _sqlite_execute(db_path: str, sql: str) -> Dict[str, Any]:
         return {"success": False, "sql": sql, "error": str(e)}
 
 
-def csv_to_table(file_path: str, table_name: str) -> Dict[str, Any]:
+def csv_to_table(file_path: str, table_name: str, username: str = "") -> Dict[str, Any]:
     try:
-        db_path = os.path.join(UPLOADS_DIR, "uploads.db")
+        db_path = _uploads_db(username)
         df = pd.read_csv(file_path)
         if df.empty:
             return {"success": False, "error": "CSV file is empty."}
@@ -77,8 +86,8 @@ def csv_to_table(file_path: str, table_name: str) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def list_uploaded_tables() -> Dict[str, Any]:
-    db_path = os.path.join(UPLOADS_DIR, "uploads.db")
+def list_uploaded_tables(username: str = "") -> Dict[str, Any]:
+    db_path = _uploads_db(username)
     if not os.path.exists(db_path):
         return {"success": True, "tables": []}
     try:
@@ -98,7 +107,7 @@ def list_uploaded_tables() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def import_db_file(db_path: str, label: str = "") -> Dict[str, Any]:
+def import_db_file(db_path: str, label: str = "", username: str = "") -> Dict[str, Any]:
     if not os.path.exists(db_path):
         return {"success": False, "error": "File not found."}
     try:
@@ -111,7 +120,7 @@ def import_db_file(db_path: str, label: str = "") -> Dict[str, Any]:
             src.close()
             return {"success": False, "error": "No tables found in database."}
 
-        dst_path = os.path.join(UPLOADS_DIR, "uploads.db")
+        dst_path = _uploads_db(username)
         dst = sqlite3.connect(dst_path)
         dst_cur = dst.cursor()
 
@@ -137,39 +146,17 @@ def import_db_file(db_path: str, label: str = "") -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def clear_uploads():
-    db_path = os.path.join(UPLOADS_DIR, "uploads.db")
+def clear_uploads(username: str = ""):
+    db_path = _uploads_db(username)
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
         except PermissionError:
             pass
-    for f in os.listdir(UPLOADS_DIR):
+    udir = _uploads_dir(username)
+    for f in os.listdir(udir):
         if f.endswith(".csv"):
             try:
-                os.remove(os.path.join(UPLOADS_DIR, f))
+                os.remove(os.path.join(udir, f))
             except PermissionError:
                 pass
-    for f in os.listdir(UPLOADS_DIR):
-        if f.endswith(".csv"):
-            try:
-                os.remove(os.path.join(UPLOADS_DIR, f))
-            except PermissionError:
-                pass
-
-
-if __name__ == "__main__":
-    import json
-    path = os.path.join(os.path.dirname(__file__), "..", "db", "sample_ecommerce.db")
-
-    print("-- valid query --")
-    print(json.dumps(execute_query(path, "SELECT name, category, price FROM products ORDER BY price DESC"), indent=2)[:600])
-
-    print("\n-- blocked query --")
-    print(json.dumps(execute_query(path, "DELETE FROM orders"), indent=2))
-
-    print("\n-- broken query --")
-    print(json.dumps(execute_query(path, "SELECT namee FROM products"), indent=2))
-
-    print("\n-- connection string --")
-    print(json.dumps(execute_query(conn_str=f"sqlite:///{path}", sql="SELECT COUNT(*) as cnt FROM customers"), indent=2))

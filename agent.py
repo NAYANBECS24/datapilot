@@ -141,14 +141,58 @@ def _chunk_text(text: str, size: int = 5) -> List[str]:
         yield " ".join(words[i:i + size]) + " "
 
 
+def _build_tool_impl(username: str = "") -> Dict[str, Any]:
+    return {
+        "get_schema": lambda **kw: get_schema(DB_PATH, conn_str=DB_CONN_STRING, username=username),
+        "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", ""), conn_str=DB_CONN_STRING),
+        "generate_chart": lambda **kw: generate_chart(
+            _normalise_data(kw.get("data", [])),
+            kw.get("chart_type", "bar"),
+            kw.get("x"),
+            kw.get("y"),
+            kw.get("title", ""),
+        ),
+        "generate_flowchart": lambda **kw: generate_flowchart(
+            kw.get("diagram_type", "er_diagram"),
+            _normalise_schema(kw.get("schema")),
+            kw.get("steps"),
+            kw.get("decision_points"),
+            kw.get("question"),
+            kw.get("branches"),
+        ),
+        "explain_data": lambda **kw: prepare_explanation_context(
+            _normalise_data(kw.get("data", [])),
+            kw.get("user_question", ""),
+            kw.get("persona", "analyst"),
+        ),
+    }
+
+
 def run_agent_turn_stream(
     user_message: str,
     history: List[Dict[str, Any]],
     tracer: AgentTracer,
     language: str = "en",
+    username: str = "",
+    file_mode: bool = False,
 ):
     lang_instruction = LANGUAGES.get(language, "")
-    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction)
+    user_context = ""
+    if file_mode:
+        user_context = (
+            f"\nCURRENT MODE: Ask from Uploaded File. "
+            f"The user ({username or 'shared'}) wants to ask questions ONLY about their uploaded data.\n"
+            f"- Call get_schema first to discover their uploaded tables (prefixed with 'my.' or 'uploads.').\n"
+            f"- Focus all answers and queries on their uploaded data only.\n"
+        )
+    elif username:
+        user_context = (
+            f"\nCurrent user: {username}. "
+            f"They have personal uploads (prefixed with 'my.' in schema) and "
+            f"shared uploads (prefixed with 'uploads.' in schema) available.\n"
+        )
+    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction) + user_context
+    tool_impl = _build_tool_impl(username)
 
     messages = [{"role": "system", "content": system_content}] + history + [{"role": "user", "content": user_message}]
 
@@ -185,7 +229,7 @@ def run_agent_turn_stream(
                 tool_input = {}
 
             with timed() as t:
-                fn = TOOL_IMPL.get(tool_name)
+                fn = tool_impl.get(tool_name)
                 result = fn(**tool_input) if fn else {"success": False, "error": f"Unknown tool '{tool_name}'"}
             tracer.log_tool_call(tool_name, tool_input, result, t.ms)
 
@@ -428,44 +472,31 @@ TOOLS = [
     },
 ]
 
-TOOL_IMPL: Dict[str, Any] = {
-    "get_schema": lambda **kw: get_schema(DB_PATH, conn_str=DB_CONN_STRING),
-
-    "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", ""), conn_str=DB_CONN_STRING),
-
-    "generate_chart": lambda **kw: generate_chart(
-        _normalise_data(kw.get("data", [])),
-        kw.get("chart_type", "bar"),
-        kw.get("x"),
-        kw.get("y"),
-        kw.get("title", ""),
-    ),
-
-    "generate_flowchart": lambda **kw: generate_flowchart(
-        kw.get("diagram_type", "er_diagram"),
-        _normalise_schema(kw.get("schema")),
-        kw.get("steps"),
-        kw.get("decision_points"),
-        kw.get("question"),
-        kw.get("branches"),
-    ),
-
-    "explain_data": lambda **kw: prepare_explanation_context(
-        _normalise_data(kw.get("data", [])),
-        kw.get("user_question", ""),
-        kw.get("persona", "analyst"),
-    ),
-}
-
-
 def run_agent_turn(
     user_message: str,
     history: List[Dict[str, Any]],
     tracer: AgentTracer,
     language: str = "en",
+    username: str = "",
+    file_mode: bool = False,
 ) -> Dict[str, Any]:
     lang_instruction = LANGUAGES.get(language, "")
-    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction)
+    user_context = ""
+    if file_mode:
+        user_context = (
+            f"\nCURRENT MODE: Ask from Uploaded File. "
+            f"The user ({username or 'shared'}) wants to ask questions ONLY about their uploaded data.\n"
+            f"- Call get_schema first to discover their uploaded tables (prefixed with 'my.' or 'uploads.').\n"
+            f"- Focus all answers and queries on their uploaded data only.\n"
+        )
+    elif username:
+        user_context = (
+            f"\nCurrent user: {username}. "
+            f"They have personal uploads (prefixed with 'my.' in schema) and "
+            f"shared uploads (prefixed with 'uploads.' in schema) available.\n"
+        )
+    system_content = SYSTEM_PROMPT_TEMPLATE.format(lang_instruction=lang_instruction) + user_context
+    tool_impl = _build_tool_impl(username)
 
     messages = [{"role": "system", "content": system_content}] + history + [{"role": "user", "content": user_message}]
 
@@ -504,7 +535,7 @@ def run_agent_turn(
                 tool_input = {}
 
             with timed() as t:
-                fn = TOOL_IMPL.get(tool_name)
+                fn = tool_impl.get(tool_name)
                 result = fn(**tool_input) if fn else {"success": False, "error": f"Unknown tool '{tool_name}'"}
             tracer.log_tool_call(tool_name, tool_input, result, t.ms)
 

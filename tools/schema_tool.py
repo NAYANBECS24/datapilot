@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from tools.db_manager import DatabaseManager, get_db_manager
 
 
-def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) -> Dict[str, Any]:
+def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None, username: str = "") -> Dict[str, Any]:
     if conn_str and not conn_str.lower().startswith("sqlite"):
         mgr = DatabaseManager(conn_str)
     elif db_path:
@@ -15,6 +15,7 @@ def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) ->
     result = mgr.get_schema()
 
     if result.get("success") and result["schema"].get("tables"):
+        _merge_uploads(result, db_path, username)
         return result
 
     if not db_path and not conn_str:
@@ -45,26 +46,7 @@ def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) ->
                 schema["tables"][table] = {"columns": columns, "foreign_keys": []}
 
             conn.close()
-
-            uploads_db = os.path.join(os.path.dirname(os.path.dirname(db_path)), "uploads", "uploads.db")
-            if os.path.exists(uploads_db):
-                try:
-                    uconn = sqlite3.connect(uploads_db)
-                    ucur = uconn.cursor()
-                    utables = [
-                        row[0] for row in ucur.execute(
-                            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-                        ).fetchall()
-                    ]
-                    for table in utables:
-                        ucolumns = []
-                        for col in ucur.execute(f"PRAGMA table_info('{table}')").fetchall():
-                            ucolumns.append({"name": col[1], "type": col[2], "primary_key": bool(col[5])})
-                        schema["tables"][f"uploads.{table}"] = {"columns": ucolumns, "foreign_keys": [], "uploaded": True}
-                    uconn.close()
-                except Exception:
-                    pass
-
+            _merge_uploads(schema, db_path, username)
             return {"success": True, "schema": schema}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -72,7 +54,32 @@ def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) ->
     return result
 
 
-if __name__ == "__main__":
-    import json
-    path = os.path.join(os.path.dirname(__file__), "..", "db", "sample_ecommerce.db")
-    print(json.dumps(get_schema(path), indent=2))
+def _merge_uploads(result: Dict[str, Any], db_path: Optional[str] = None, username: str = ""):
+    try:
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        candidates = []
+        if username.strip():
+            candidates.append(os.path.join(base_dir, "uploads", username.strip().lower(), "uploads.db"))
+        candidates.append(os.path.join(base_dir, "uploads", "shared", "uploads.db"))
+
+        schema = result["schema"]
+        for uploads_db in candidates:
+            if not os.path.exists(uploads_db):
+                continue
+            import sqlite3
+            uconn = sqlite3.connect(uploads_db)
+            ucur = uconn.cursor()
+            utables = [
+                row[0] for row in ucur.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+            prefix = "uploads." if "shared" in uploads_db else "my."
+            for table in utables:
+                ucolumns = []
+                for col in ucur.execute(f"PRAGMA table_info('{table}')").fetchall():
+                    ucolumns.append({"name": col[1], "type": col[2], "primary_key": bool(col[5])})
+                schema["tables"][f"{prefix}{table}"] = {"columns": ucolumns, "foreign_keys": [], "uploaded": True}
+            uconn.close()
+    except Exception:
+        pass

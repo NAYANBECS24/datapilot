@@ -17,6 +17,7 @@ from tools.insight_tool import detect_anomalies, generate_auto_insights
 from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads, import_db_file
 from tools.schema_tool import get_schema
 from tools.db_manager import DatabaseManager, validate_query
+from auth.auth import register, login, get_user
 
 st.set_page_config(
     page_title="DataPilot · Conversational BI Agent",
@@ -46,10 +47,53 @@ _DEFAULT = {
     "auto_insights": None,
     "db_conn_str": os.getenv("DATABASE_URL", ""),
     "voice_mode": False,
+    "user": None,
+    "auth_page": "login",
+    "upload_mode": "personal",
+    "file_mode": False,
 }
 for k, v in _DEFAULT.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+if not st.session_state.user:
+    st.markdown(f"""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * {{ font-family: 'Inter', sans-serif; }}
+        body {{ background: #0a0c14; }}
+    </style>
+    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align:center;font-weight:800;font-size:3rem;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:2rem;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
+
+        tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
+        with tab_log:
+            with st.form("login_form"):
+                lun = st.text_input("Username", placeholder="Enter your username")
+                lpw = st.text_input("Password", type="password", placeholder="Enter your password")
+                if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                    r = login(lun, lpw)
+                    if r["success"]:
+                        st.session_state.user = r["username"]
+                        st.rerun()
+                    else:
+                        st.error(r["error"])
+        with tab_reg:
+            with st.form("register_form"):
+                run = st.text_input("Choose a username", placeholder="Min 3 characters")
+                rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
+                if st.form_submit_button("Register", use_container_width=True, type="primary"):
+                    r = register(run, rpw)
+                    if r["success"]:
+                        st.success("Registered! Login now.")
+                        st.session_state.auth_page = "login"
+                    else:
+                        st.error(r["error"])
+    st.stop()
 
 mode = "dark" if st.session_state.dark_mode else "light"
 
@@ -611,6 +655,36 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    with st.expander("👤 Account", expanded=True):
+        st.markdown(f'<span style="font-size:13px;">Logged in as <strong>{st.session_state.user}</strong></span>', unsafe_allow_html=True)
+        if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
+
+    u1, u2 = st.columns(2)
+    with u1:
+        st.session_state.upload_mode = "personal" if st.button(
+            "👤 Personal" if st.session_state.upload_mode != "personal" else "✅ Personal",
+            use_container_width=True,
+            key="mode_personal",
+        ) else st.session_state.upload_mode
+    with u2:
+        st.session_state.upload_mode = "shared" if st.button(
+            "🌐 Shared" if st.session_state.upload_mode != "shared" else "✅ Shared",
+            use_container_width=True,
+            key="mode_shared",
+        ) else st.session_state.upload_mode
+
+    st.session_state.file_mode = st.toggle(
+        "📁 Ask from Uploaded File",
+        value=st.session_state.file_mode,
+        help="Focus the agent on your uploaded data. Ask questions only about your uploaded files.",
+    )
+
+    _current_user = st.session_state.user if st.session_state.upload_mode == "personal" else ""
+    _upload_label = f" ({st.session_state.user})" if _current_user else " (shared)"
+
     st.divider()
 
     with st.expander("🔍 Agent Trace", expanded=True):
@@ -696,7 +770,7 @@ with st.sidebar:
             db_type = "MySQL"
         st.markdown(f'<span style="font-size:10px;color:{_text2};">Connected: {db_type}</span>', unsafe_allow_html=True)
 
-    with st.expander("📁 Upload CSV", expanded=False):
+    with st.expander("📁 Upload CSV" + _upload_label, expanded=False):
         uploaded_csv = st.file_uploader("Choose CSV", type=["csv"], label_visibility="collapsed", key="csv_upload")
         if uploaded_csv:
             tbl = st.text_input("Table name", value=uploaded_csv.name.replace(".csv", "").replace(" ", "_").lower())
@@ -705,7 +779,7 @@ with st.sidebar:
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
                 tmp.write(uploaded_csv.getbuffer())
                 tmp.close()
-                r = csv_to_table(tmp.name, tbl)
+                r = csv_to_table(tmp.name, tbl, username=_current_user)
                 os.unlink(tmp.name)
                 if r["success"]:
                     st.success(f"Imported {r['row_count']} rows")
@@ -713,7 +787,7 @@ with st.sidebar:
                 else:
                     st.error(r["error"])
 
-    with st.expander("🗄️ Upload SQLite DB", expanded=False):
+    with st.expander("🗄️ Upload SQLite DB" + _upload_label, expanded=False):
         uploaded_db = st.file_uploader("Choose .db file", type=["db", "sqlite", "sqlite3"], label_visibility="collapsed", key="db_upload")
         if uploaded_db:
             label = st.text_input("Label (optional)", value=uploaded_db.name.replace(".db", "").replace(".sqlite", "").replace(" ", "_").lower())
@@ -722,7 +796,7 @@ with st.sidebar:
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
                 tmp.write(uploaded_db.getbuffer())
                 tmp.close()
-                r = import_db_file(tmp.name, label)
+                r = import_db_file(tmp.name, label, username=_current_user)
                 os.unlink(tmp.name)
                 if r["success"]:
                     for t in r["tables"]:
@@ -731,8 +805,8 @@ with st.sidebar:
                 else:
                     st.error(r["error"])
 
-    if st.button("🗑️ Clear All Uploads", use_container_width=True, type="secondary"):
-        clear_uploads()
+    if st.button("🗑️ Clear Uploads" + _upload_label, use_container_width=True, type="secondary"):
+        clear_uploads(username=_current_user)
         st.session_state.auto_insights = None
         st.rerun()
 
@@ -1053,7 +1127,12 @@ with tab_chat:
         with st.chat_message("assistant"):
             with st.spinner("Running tools..."):
                 try:
-                    result = run_agent_turn(prompt, api_hist, tracer, language=st.session_state.language)
+                    result = run_agent_turn(
+                        prompt, api_hist, tracer,
+                        language=st.session_state.language,
+                        username=_current_user,
+                        file_mode=st.session_state.file_mode,
+                    )
                 except Exception as e:
                     result = {"reply": f"⚠️ {e}", "charts": [], "diagrams": [], "sql_queries": []}
 
@@ -1135,21 +1214,22 @@ with tab_data:
         try:
             s = get_schema(db_path=sample_path)
             if s.get("success"):
-                all_sources.append(("Sample E-Commerce DB", sample_path, s["tables"]))
+                all_sources.append(("📦 Sample E-Commerce DB", sample_path, s["tables"]))
         except Exception:
             pass
 
-    uploads_info = list_uploaded_tables()
-    if uploads_info.get("success") and uploads_info["tables"]:
-        up_path = os.path.join(os.path.dirname(__file__), "uploads", "uploads.db")
-        if os.path.exists(up_path):
-            all_sources.append(("Uploaded Data", up_path, uploads_info["tables"]))
+    for label, mode_username in [("👤 My Uploads", st.session_state.user), ("🌐 Shared Uploads", "")]:
+        info = list_uploaded_tables(username=mode_username)
+        if info.get("success") and info["tables"]:
+            from tools.query_tool import _uploads_db as _get_up_db
+            up_path = _get_up_db(mode_username)
+            all_sources.append((label, up_path, info["tables"]))
 
     if not all_sources:
         st.info("No databases found. Upload a CSV or SQLite file to get started.")
     else:
         for src_name, src_path, tables in all_sources:
-            st.markdown(f'<h4 style="color:{_accent};">📁 {src_name}</h4>', unsafe_allow_html=True)
+            st.markdown(f'<h4 style="color:{_accent};">{src_name}</h4>', unsafe_allow_html=True)
             st.code(src_path, language="text")
             for t in tables:
                 cols_fmt = ", ".join(t["columns"][:5])
