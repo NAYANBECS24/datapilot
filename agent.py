@@ -10,6 +10,9 @@ from tools.query_tool import execute_query
 from tools.chart_tool import generate_chart
 from tools.flowchart_tool import generate_flowchart
 from tools.insight_tool import prepare_explanation_context, detect_anomalies
+from tools.analytics_tool import generate_forecast, compare_segments
+from tools.quality_tool import scan_quality
+from tools.report_tool import generate_report
 from tools.db_manager import DEFAULT_CONN_STRING
 from trace.tracer import AgentTracer, timed
 
@@ -164,6 +167,27 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             _normalise_data(kw.get("data", [])),
             kw.get("user_question", ""),
             kw.get("persona", "analyst"),
+        ),
+        "forecast_data": lambda **kw: generate_forecast(
+            _normalise_data(kw.get("data", [])),
+            kw.get("date_col", ""),
+            kw.get("value_col", ""),
+            kw.get("periods", 5),
+        ),
+        "compare_data": lambda **kw: compare_segments(
+            _normalise_data(kw.get("data_a", [])),
+            _normalise_data(kw.get("data_b", [])),
+            kw.get("label_a", "A"),
+            kw.get("label_b", "B"),
+            kw.get("value_col", ""),
+            kw.get("category_col", ""),
+        ),
+        "scan_quality": lambda **kw: scan_quality(DB_PATH),
+        "generate_report": lambda **kw: generate_report(
+            _normalise_data(kw.get("data", [])),
+            kw.get("columns", []),
+            kw.get("question", ""),
+            kw.get("chart_titles"),
         ),
     }
 
@@ -394,6 +418,12 @@ RULES:
   6. After getting data, write a short clear summary with real numbers.
   7. Suggest one follow-up question the user might ask next.
   8. Be concise. Let charts and diagrams do the heavy lifting.
+  9. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
+     a time period), ask a short clarifying question instead of guessing.
+ 10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
+     in follow-up questions. They refer to entities from the previous turn, not all data.
+ 11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
+     You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
 """
 
 TOOLS = [
@@ -467,6 +497,67 @@ TOOLS = [
                     "persona": {"type": "string", "enum": ["analyst", "executive"], "description": "Explanation style."},
                 },
                 "required": ["data", "user_question"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "forecast_data",
+            "description": "Predict future values from time-series data using trend forecasting.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}},
+                    "date_col": {"type": "string", "description": "Column with dates."},
+                    "value_col": {"type": "string", "description": "Column with numeric values to forecast."},
+                    "periods": {"type": "integer", "description": "Number of future periods to predict (default 5)."},
+                },
+                "required": ["data", "date_col", "value_col"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_data",
+            "description": "Compare two sets of query results side-by-side (e.g. two time periods, two segments).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data_a": {"type": "array", "items": {"type": "object"}, "description": "First segment rows."},
+                    "data_b": {"type": "array", "items": {"type": "object"}, "description": "Second segment rows."},
+                    "label_a": {"type": "string", "description": "Label for first segment (e.g. 'This Quarter')."},
+                    "label_b": {"type": "string", "description": "Label for second segment (e.g. 'Last Quarter')."},
+                    "value_col": {"type": "string", "description": "Numeric column to compare."},
+                    "category_col": {"type": "string", "description": "Optional category column for breakdown."},
+                },
+                "required": ["data_a", "data_b", "value_col"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scan_quality",
+            "description": "Scan the database for data quality issues: nulls, duplicates, and outlier values.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_report",
+            "description": "Generate a structured data storytelling report with summary stats and insights.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}},
+                    "columns": {"type": "array", "items": {"type": "string"}},
+                    "question": {"type": "string", "description": "The original question."},
+                    "chart_titles": {"type": "array", "items": {"type": "string"}, "description": "Titles of charts included."},
+                },
+                "required": ["data", "columns"],
             },
         },
     },

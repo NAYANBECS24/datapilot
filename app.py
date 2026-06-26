@@ -620,7 +620,39 @@ def _stats():
 
 # ── WELCOME SUGGESTIONS ──
 
-WELCOME_CARDS = [
+@st.cache_data(show_spinner=False)
+def _smart_suggestions() -> List[tuple]:
+    try:
+        s = get_schema(db_path=_db_path)
+        if not s.get("success"):
+            return _STATIC_CARDS
+        tables = s["schema"]["tables"]
+        cats = set()
+        for tname, tinfo in tables.items():
+            for c in tinfo.get("columns", []):
+                if c.get("name") == "category":
+                    try:
+                        conn = sqlite3.connect(_db_path)
+                        for r in conn.execute(f'SELECT DISTINCT category FROM "{tname}" WHERE category IS NOT NULL LIMIT 4'):
+                            cats.add(str(r[0]))
+                        conn.close()
+                    except Exception:
+                        pass
+
+        cats_list = list(cats)[:3]
+        dynamic = []
+        if cats_list:
+            dynamic.append(("📊", f"Category Breakdown", f"Show me revenue breakdown by {cats_list[0]}"))
+            dynamic.append(("📊", "All Categories", "Show me revenue by product category"))
+        dynamic.append(("🔮", "Forecast Revenue", "Forecast revenue for next 5 months"))
+        dynamic.append(("📋", "Data Quality", "Scan the database for data quality issues"))
+        if len(cats_list) > 1:
+            dynamic.append(("📊", "Compare Categories", f"Compare sales between {cats_list[0]} and {cats_list[1]}"))
+        return dynamic + _STATIC_CARDS[:4]
+    except Exception:
+        return _STATIC_CARDS
+
+_STATIC_CARDS = [
     ("📊", "Top Products", "Show me the top 5 products by revenue"),
     ("📈", "Monthly Trend", "Show me monthly revenue trend for this year"),
     ("🏙️", "City Analysis", "What is the average order value per city?"),
@@ -631,6 +663,7 @@ WELCOME_CARDS = [
     ("🌳", "Decision Tree", "Create a decision tree for prioritizing which products to restock based on sales velocity and profit margin"),
 ]
 
+WELCOME_CARDS = _smart_suggestions()
 SUGGESTION_CHIPS = [c[2] for c in WELCOME_CARDS]
 
 
@@ -1382,6 +1415,31 @@ with tab_profiler:
     else:
         st.error("Could not read database schema.")
 
+    with st.expander("🔍 Data Quality Scanner", expanded=False):
+        st.caption("Scan all tables for nulls, duplicates, and outlier values.")
+        if st.button("Scan Quality", use_container_width=True):
+            from tools.quality_tool import scan_quality
+            qr = scan_quality(_db_path)
+            if qr.get("success"):
+                if qr["clean"]:
+                    st.success("No issues found! Dataset looks clean.")
+                else:
+                    st.warning(f"Found **{qr['total_issues']}** potential issues across {len(qr['tables'])} tables.")
+                for tname, treport in qr["tables"].items():
+                    with st.container():
+                        st.markdown(f"**{tname}** ({treport['row_count']} rows)")
+                        if treport["null_columns"]:
+                            st.markdown(f"  - Nulls: {treport['null_columns']}")
+                        if treport["duplicate_rows"]:
+                            st.markdown(f"  - Duplicates: {treport['duplicate_rows']} rows")
+                        if treport["outlier_columns"]:
+                            for oc in treport["outlier_columns"]:
+                                st.markdown(f"  - Outliers in {oc['column']}: {oc['outliers']} values exceed ±2σ (>{oc['threshold']})")
+                        if treport["issue_count"] == 0:
+                            st.markdown("  - ✅ Clean")
+            else:
+                st.error(qr.get("error", "Scan failed."))
+
 
 # ══════════════════════════════ INSIGHTS ═════════════════════════════════
 
@@ -1477,6 +1535,34 @@ with tab_insights:
                 file_name="insights_report.json",
                 mime="application/json",
             )
+
+    st.divider()
+    with st.expander("📖 Data Storytelling Report", expanded=False):
+        st.caption("Generate a narrative report combining multiple perspectives into one story.")
+        report_driver = st.text_input("Focus area (e.g. 'sales performance', 'customer behavior')", placeholder="What story do you want to tell?")
+        if st.button("Generate Story", use_container_width=True) and report_driver:
+            with st.spinner("Building your data story..."):
+                from tools.report_tool import generate_report
+                from tools.insight_tool import generate_auto_insights
+                ai = generate_auto_insights(_db_path)
+                if ai.get("error"):
+                    st.error(ai["error"])
+                else:
+                    metrics = ai.get("metrics", {})
+                    sample = []
+                    if metrics.get("monthly_revenue"):
+                        sample = metrics["monthly_revenue"]
+                    cols = list(sample[0].keys()) if sample else []
+                    r = generate_report(sample, cols, question=report_driver,
+                                        chart_titles=["Monthly Revenue", "Category Breakdown", "Order Status"])
+                    if r.get("success"):
+                        st.markdown(f'<div style="background:{_card_bg};padding:1.5rem;border-radius:12px;border:1px solid {_card_border};">', unsafe_allow_html=True)
+                        st.markdown(r["summary"])
+                        if r.get("insights"):
+                            st.markdown("#### Key Insights")
+                            for ins in r["insights"]:
+                                st.markdown(f"- {ins}")
+                        st.markdown("</div>", unsafe_allow_html=True)
 
     ut = list_uploaded_tables()
     if ut.get("success") and ut["tables"]:

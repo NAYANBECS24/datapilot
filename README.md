@@ -40,6 +40,14 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | **Shared Database** | ✅ Team-accessible common upload area |
 | **Ask from Uploaded File Mode** | ✅ Agent focuses only on your uploaded data |
 | **My Data Tab** | ✅ Browse all tables, row counts, columns |
+| **Smart Query Suggestions** | ✅ Dynamic schema-aware suggestions on empty chat |
+| **Data Quality Scanner** | ✅ Null, duplicate, and outlier detection per table |
+| **Predictive Forecasting** | ✅ Trend-based forecast (next N periods) from query results |
+| **Comparative Analysis** | ✅ Side-by-side segment comparison with % change |
+| **Data Storytelling Reports** | ✅ Narrative report combining metrics + insights |
+| **Clarifying Questions** | ✅ Agent asks when query is ambiguous |
+| **Multi-Hop Context** | ✅ Understands "them", "those", "that" across turns |
+| **Cross-DB Joins** | ✅ Query across sample DB + uploads in one SQL |
 | Dashboard HTML export | ✅ Download full dashboard as HTML |
 | Collaborative share | ✅ Copy conversation to clipboard |
 | Docker support | ✅ Dockerfile + docker-compose.yml |
@@ -158,7 +166,10 @@ datapilot/
 │   ├── query_tool.py        execute_query + validate_query + CSV/DB upload + per-user paths
 │   ├── chart_tool.py        generate_chart — bar/line/pie/scatter/auto
 │   ├── flowchart_tool.py    generate_flowchart — ER diagram + process flow + decision tree
-│   └── insight_tool.py      explain_data + detect_anomalies + generate_auto_insights
+│   ├── insight_tool.py      explain_data + detect_anomalies + generate_auto_insights
+│   ├── analytics_tool.py    generate_forecast + compare_segments
+│   ├── quality_tool.py      scan_quality — nulls/duplicates/outliers
+│   └── report_tool.py       generate_report — data storytelling narrative
 ├── db/
 │   ├── seed_db.py           Sample e-commerce SQLite dataset generator
 │   ├── check_db.py          Database validation helper
@@ -241,6 +252,62 @@ Toggle **"Ask from Uploaded File"** in the sidebar to switch the agent into file
 - It only queries tables from your uploaded data (`my.*` or `uploads.*`)
 - Perfect for: *"Upload your Excel → switch mode → ask questions about it"*
 - The system prompt dynamically changes to guide the agent's focus
+
+---
+
+## Smart Query Suggestions
+
+When the chat is empty, DataPilot reads the actual database schema and generates relevant questions dynamically (e.g., "Show me revenue by Electronics" if the Electronics category exists). Falls back to 8 static examples if the schema read fails.
+
+---
+
+## Predictive Forecasting
+
+New tool: `forecast_data` — uses numpy polyfit to predict future values from time-series data.
+
+**Example:** *"Forecast revenue for next 5 months"* → agent queries monthly revenue → calls `forecast_data` → returns projected values with trend direction (up/down/flat).
+
+---
+
+## Comparative Analysis
+
+New tool: `compare_data` — compares two query result sets side-by-side with absolute and percent change.
+
+**Example:** *"Compare this quarter's sales to last quarter"* → agent queries both periods → calls `compare_data` → shows total, avg, max, min, top categories for each segment + % change.
+
+---
+
+## Data Storytelling Reports
+
+New tool + UI: `generate_report` combines summary statistics, top categories, and chart references into a single narrative.
+
+- Available in the **Auto Insights** tab under "Data Storytelling Report"
+- Type a focus area (e.g. "sales performance") → generates a structured story
+- Includes key metrics, insights, and a list of visualizations included
+
+---
+
+## Data Quality Scanner
+
+New tool + UI: `scan_quality` checks every table for:
+
+| Check | What It Finds |
+|---|---|
+| **Null values** | Columns with missing data and counts |
+| **Duplicate rows** | Exact row duplicates |
+| **Outlier values** | Values exceeding ±2σ (z-score) in numeric columns |
+
+Available in the **Data Profiler** tab under "Data Quality Scanner" → click "Scan Quality".
+
+---
+
+## Clarifying Questions, Multi-Hop Context & Cross-DB Joins
+
+These are built into the agent's system prompt (no separate UI):
+
+- **Clarifying:** *"Show me sales"* → *"Which time period?"* instead of guessing
+- **Multi-Hop:** *"Show top customers"* → *"Which are from Mumbai?"* → understands "which" = top customers
+- **Cross-DB Joins:** The sample DB and uploads DB are SQLite-attached — agent can write `JOIN uploads.my_table` in a single query
 
 ---
 
