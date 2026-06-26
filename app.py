@@ -93,6 +93,7 @@ if not st.session_state.user:
                         st.session_state.auth_page = "login"
                     else:
                         st.error(r["error"])
+    st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>', unsafe_allow_html=True)
     st.stop()
 
 mode = "dark" if st.session_state.dark_mode else "light"
@@ -469,11 +470,22 @@ theme_css = f"""
     @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(6px); }} to {{ opacity: 1; transform: translateY(0); }} }}
     @keyframes bounce {{ 0%,60%,100% {{ transform: translateY(0); }} 30% {{ transform: translateY(-7px); }} }}
     @keyframes pulse {{ 0%,100% {{ opacity: 1; }} 50% {{ opacity: 0.4; }} }}
+    .app-footer {{
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+        text-align: center; padding: 8px; font-size: 12px;
+        background: {_bg2}; color: {_text2};
+        border-top: 1px solid {_card_border};
+    }}
+    .login-footer {{
+        text-align: center; padding: 20px; font-size: 12px; color: #7a7d91;
+    }}
 </style>
 <div class="gradient-bar"></div>
 """
 st.markdown(theme_css, unsafe_allow_html=True)
 
+team_footer = '<div class="app-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>'
+st.markdown(team_footer, unsafe_allow_html=True)
 
 # ── HELPERS ──────────────────────────────────────────────────────────────
 
