@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 .env
-db/sample_ecommerce.db
 .streamlit/secrets.toml
 .vscode/
 .DS_Store
