@@ -135,8 +135,8 @@ if not st.session_state.user:
         .login-dot:nth-child(7) {{ top: 90%; left: 40%; animation-delay: 1.8s; }}
         .login-dot:nth-child(8) {{ top: 10%; left: 80%; animation-delay: 3.0s; }}
 
-        .login-card {{
-            position: relative; z-index: 1;
+        /* Card styling — targets the middle column container on login page */
+        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child {{
             background: rgba(10, 12, 22, 0.75) !important;
             backdrop-filter: blur(24px) !important;
             -webkit-backdrop-filter: blur(24px) !important;
@@ -144,7 +144,15 @@ if not st.session_state.user:
             border-radius: 20px !important;
             padding: 2.5rem 2rem !important;
             box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,170,0.04) !important;
-            width: 100%; max-width: 440px; margin: 0 auto;
+            max-width: 440px; margin: 0 auto;
+        }}
+        /* Remove extra spacing from Streamlit's auto-wrapping in the card */
+        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child > div {{
+            margin-bottom: 0 !important;
+        }}
+        /* Make title + subtitle tabs appear inside the card */
+        div[data-testid="column"]:nth-child(2) > div:first-child > div:first-child > div:first-child {{
+            padding-top: 0 !important;
         }}
 
         @keyframes barPulse {{
@@ -162,7 +170,6 @@ if not st.session_state.user:
 
         .stApp > header, #MainMenu, footer, div[data-testid="stToolbar"] {{ display: none !important; }}
         .main > div:first-child > div:first-child {{ padding: 0 !important; max-width: 100% !important; }}
-        section[data-testid="stVerticalBlock"] > div[data-testid="element-container"] > div > div > div > div > div > div > div > div:has(.login-card) {{ width: 100% !important; }}
         .stTabs [data-baseweb="tab-list"] {{ background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.06) !important; border-radius: 12px !important; }}
         .stTabs [data-baseweb="tab"] {{ color: #7a7d91 !important; font-size: 13px !important; }}
         .stTabs [aria-selected="true"] {{ background: linear-gradient(135deg,#00d4aa,#7c3aed) !important; color: #000 !important; font-weight: 600 !important; }}
@@ -199,37 +206,33 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    _, col2, _ = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown(f'<div class="login-card">', unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align:center;font-weight:800;font-size:2.5rem;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.25rem;'>DataPilot</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1.5rem;font-size:14px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;margin-bottom:0.5rem;'><span style='font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</span></div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1.5rem;font-size:14px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
 
-        tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
-        with tab_log:
-            with st.form("login_form"):
-                lun = st.text_input("Username", placeholder="Enter your username")
-                lpw = st.text_input("Password", type="password", placeholder="Enter your password")
-                if st.form_submit_button("Login", use_container_width=True, type="primary"):
-                    r = login(lun, lpw)
-                    if r["success"]:
-                        st.session_state.user = r["username"]
-                        st.rerun()
-                    else:
-                        st.error(r["error"])
-        with tab_reg:
-            with st.form("register_form"):
-                run = st.text_input("Choose a username", placeholder="Min 3 characters")
-                rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
-                if st.form_submit_button("Register", use_container_width=True, type="primary"):
-                    r = register(run, rpw)
-                    if r["success"]:
-                        st.success("Registered! Login now.")
-                        st.session_state.auth_page = "login"
-                    else:
-                        st.error(r["error"])
-        st.markdown('</div>', unsafe_allow_html=True)
+    tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
+    with tab_log:
+        with st.form("login_form"):
+            lun = st.text_input("Username", placeholder="Enter your username")
+            lpw = st.text_input("Password", type="password", placeholder="Enter your password")
+            if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                r = login(lun, lpw)
+                if r["success"]:
+                    st.session_state.user = r["username"]
+                    st.rerun()
+                else:
+                    st.error(r["error"])
+    with tab_reg:
+        with st.form("register_form"):
+            run = st.text_input("Choose a username", placeholder="Min 3 characters")
+            rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
+            if st.form_submit_button("Register", use_container_width=True, type="primary"):
+                r = register(run, rpw)
+                if r["success"]:
+                    st.success("Registered! Login now.")
+                    st.session_state.auth_page = "login"
+                else:
+                    st.error(r["error"])
     st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>', unsafe_allow_html=True)
     st.stop()
 
