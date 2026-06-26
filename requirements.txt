@@ -5,10 +5,10 @@ python-dotenv>=1.0
 pandas>=2.2
 kaleido>=0.2.1
 
-anthropic>=0.50
 fpdf2>=2.7
 
 # Optional: install these for extra features
+# anthropic>=0.50          # Anthropic Claude support
 # psycopg2-binary>=2.9     # PostgreSQL support
 # pymysql>=1.1             # MySQL support
 # pymongo>=4.6             # MongoDB support
