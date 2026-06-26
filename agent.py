@@ -334,8 +334,14 @@ IMPORTANT COLUMN NOTES:
   - Use customers.name (NOT customer_name) for customer names
   - Use category from products for product categories
 
+USER-UPLOADED DATA:
+  Users can upload CSV files or entire SQLite databases. When you call get_schema,
+  any uploaded tables will appear with an "uploads." prefix (e.g. "uploads.my_table").
+  These tables live in a separate database file but you can query them with normal SQL.
+
 RULES:
   1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
+     This also discovers any user-uploaded tables.
   2. Only write read-only SELECT queries. Never DML/DDL.
   3. When a chart or diagram helps, call generate_chart or generate_flowchart.
   4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).

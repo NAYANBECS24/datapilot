@@ -46,7 +46,7 @@ def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None) ->
 
             conn.close()
 
-            uploads_db = os.path.join(os.path.dirname(db_path), "uploads", "uploads.db")
+            uploads_db = os.path.join(os.path.dirname(os.path.dirname(db_path)), "uploads", "uploads.db")
             if os.path.exists(uploads_db):
                 try:
                     uconn = sqlite3.connect(uploads_db)

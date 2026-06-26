@@ -14,7 +14,7 @@ from fpdf import FPDF
 from agent import LANGUAGES, run_agent_turn, get_llm_status
 from trace.tracer import AgentTracer
 from tools.insight_tool import detect_anomalies, generate_auto_insights
-from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads
+from tools.query_tool import execute_query, csv_to_table, list_uploaded_tables, clear_uploads, import_db_file
 from tools.schema_tool import get_schema
 from tools.db_manager import DatabaseManager, validate_query
 
@@ -697,13 +697,13 @@ with st.sidebar:
         st.markdown(f'<span style="font-size:10px;color:{_text2};">Connected: {db_type}</span>', unsafe_allow_html=True)
 
     with st.expander("📁 Upload CSV", expanded=False):
-        uploaded = st.file_uploader("Choose CSV", type=["csv"], label_visibility="collapsed")
-        if uploaded:
-            tbl = st.text_input("Table name", value=uploaded.name.replace(".csv", "").replace(" ", "_").lower())
-            if st.button("Import", use_container_width=True):
+        uploaded_csv = st.file_uploader("Choose CSV", type=["csv"], label_visibility="collapsed", key="csv_upload")
+        if uploaded_csv:
+            tbl = st.text_input("Table name", value=uploaded_csv.name.replace(".csv", "").replace(" ", "_").lower())
+            if st.button("Import CSV", use_container_width=True):
                 import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-                tmp.write(uploaded.getbuffer())
+                tmp.write(uploaded_csv.getbuffer())
                 tmp.close()
                 r = csv_to_table(tmp.name, tbl)
                 os.unlink(tmp.name)
@@ -712,9 +712,29 @@ with st.sidebar:
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
-        if st.button("Clear Uploads", use_container_width=True):
-            clear_uploads()
-            st.session_state.auto_insights = None
+
+    with st.expander("🗄️ Upload SQLite DB", expanded=False):
+        uploaded_db = st.file_uploader("Choose .db file", type=["db", "sqlite", "sqlite3"], label_visibility="collapsed", key="db_upload")
+        if uploaded_db:
+            label = st.text_input("Label (optional)", value=uploaded_db.name.replace(".db", "").replace(".sqlite", "").replace(" ", "_").lower())
+            if st.button("Import DB", use_container_width=True):
+                import tempfile
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+                tmp.write(uploaded_db.getbuffer())
+                tmp.close()
+                r = import_db_file(tmp.name, label)
+                os.unlink(tmp.name)
+                if r["success"]:
+                    for t in r["tables"]:
+                        st.success(f"Imported '{t['original']}' → '{t['as']}' ({t['row_count']} rows)")
+                    st.session_state.auto_insights = None
+                else:
+                    st.error(r["error"])
+
+    if st.button("🗑️ Clear All Uploads", use_container_width=True, type="secondary"):
+        clear_uploads()
+        st.session_state.auto_insights = None
+        st.rerun()
 
     with st.expander("🔔 Data Whisperer", expanded=False):
         st.caption("Scan last results for statistical outliers.")
@@ -783,8 +803,8 @@ with st.sidebar:
 
 # ── TABS ─────────────────────────────────────────────────────────────────
 
-tab_chat, tab_dashboard, tab_profiler, tab_insights = st.tabs(
-    ["💬 Chat", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights"]
+tab_chat, tab_data, tab_dashboard, tab_profiler, tab_insights = st.tabs(
+    ["💬 Chat", "🗂️ My Data", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights"]
 )
 
 
@@ -1101,6 +1121,51 @@ with tab_chat:
             }
             st.session_state.messages.append(payload)
 
+
+# ══════════════════════════════ MY DATA ═════════════════════════════════
+
+with tab_data:
+    st.markdown(f'<h3 style="color:{_accent};">🗂️ Your Data Sources</h3>', unsafe_allow_html=True)
+    st.caption("All databases and tables available for querying.")
+
+    all_sources = []
+
+    sample_path = _db_path
+    if os.path.exists(sample_path):
+        try:
+            s = get_schema(db_path=sample_path)
+            if s.get("success"):
+                all_sources.append(("Sample E-Commerce DB", sample_path, s["tables"]))
+        except Exception:
+            pass
+
+    uploads_info = list_uploaded_tables()
+    if uploads_info.get("success") and uploads_info["tables"]:
+        up_path = os.path.join(os.path.dirname(__file__), "uploads", "uploads.db")
+        if os.path.exists(up_path):
+            all_sources.append(("Uploaded Data", up_path, uploads_info["tables"]))
+
+    if not all_sources:
+        st.info("No databases found. Upload a CSV or SQLite file to get started.")
+    else:
+        for src_name, src_path, tables in all_sources:
+            st.markdown(f'<h4 style="color:{_accent};">📁 {src_name}</h4>', unsafe_allow_html=True)
+            st.code(src_path, language="text")
+            for t in tables:
+                cols_fmt = ", ".join(t["columns"][:5])
+                if len(t["columns"]) > 5:
+                    cols_fmt += f" … +{len(t['columns'])-5} more"
+                c1, c2, c3 = st.columns([3, 1, 1])
+                with c1:
+                    st.markdown(f'**{t["table_name"]}**')
+                with c2:
+                    st.markdown(f'`{t["row_count"]} rows`')
+                with c3:
+                    with st.popover("Columns", help="View columns"):
+                        for col in t["columns"]:
+                            st.code(col)
+                st.markdown(f'<span style="font-size:12px;color:{_text2};">{cols_fmt}</span>', unsafe_allow_html=True)
+                st.divider()
 
 # ══════════════════════════════ DASHBOARD ════════════════════════════════
 

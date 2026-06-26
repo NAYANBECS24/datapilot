@@ -98,6 +98,45 @@ def list_uploaded_tables() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
+def import_db_file(db_path: str, label: str = "") -> Dict[str, Any]:
+    if not os.path.exists(db_path):
+        return {"success": False, "error": "File not found."}
+    try:
+        src = sqlite3.connect(db_path)
+        src_cur = src.cursor()
+        tables = [row[0] for row in src_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()]
+        if not tables:
+            src.close()
+            return {"success": False, "error": "No tables found in database."}
+
+        dst_path = os.path.join(UPLOADS_DIR, "uploads.db")
+        dst = sqlite3.connect(dst_path)
+        dst_cur = dst.cursor()
+
+        imported = []
+        for table in tables:
+            safe_name = f"{label}_{table}" if label else table
+            safe_name = "".join(c if c.isalnum() or c == "_" else "_" for c in safe_name)
+            dst_cur.execute(f"DROP TABLE IF EXISTS \"{safe_name}\"")
+            src_cur.execute(f"SELECT * FROM \"{table}\"")
+            rows = src_cur.fetchall()
+            col_names = [d[0] for d in src_cur.description]
+            col_defs = ", ".join(f'"{c}" TEXT' for c in col_names)
+            dst_cur.execute(f"CREATE TABLE \"{safe_name}\" ({col_defs})")
+            placeholders = ", ".join("?" for _ in col_names)
+            dst_cur.executemany(f"INSERT INTO \"{safe_name}\" VALUES ({placeholders})", rows)
+            dst.commit()
+            imported.append({"original": table, "as": safe_name, "row_count": len(rows)})
+
+        src.close()
+        dst.close()
+        return {"success": True, "tables": imported}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def clear_uploads():
     db_path = os.path.join(UPLOADS_DIR, "uploads.db")
     if os.path.exists(db_path):
@@ -105,6 +144,12 @@ def clear_uploads():
             os.remove(db_path)
         except PermissionError:
             pass
+    for f in os.listdir(UPLOADS_DIR):
+        if f.endswith(".csv"):
+            try:
+                os.remove(os.path.join(UPLOADS_DIR, f))
+            except PermissionError:
+                pass
     for f in os.listdir(UPLOADS_DIR):
         if f.endswith(".csv"):
             try:
