@@ -1,3 +1,4 @@
+import os
 import statistics
 from typing import Any, Dict, List, Optional
 
@@ -78,14 +79,12 @@ def detect_anomalies(
 
 def generate_auto_insights(db_path: str, conn_str: str = "") -> Dict[str, Any]:
     try:
-        if conn_str and conn_str.startswith("sqlite"):
-            actual_path = conn_str.split("://", 1)[-1] if "://" in conn_str else conn_str
-            db_path = actual_path or db_path
-
         if conn_str and (conn_str.startswith("postgresql") or conn_str.startswith("postgres")):
             return _generate_auto_insights_pg(conn_str)
 
         import sqlite3
+        if not os.path.exists(db_path):
+            return {"error": f"Database file not found at: {db_path}"}
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
