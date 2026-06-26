@@ -64,6 +64,9 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | **One-Click Chart Presets** | ✅ Bar/Line/Pie/Scatter buttons for every table in My Data |
 | **RAG — Document Search** | ✅ Upload PDF/TXT/MD → agent searches with vector embeddings (ChromaDB) |
 | **Documents Tab** | ✅ Browse indexed docs, view chunks, per-document delete |
+| **ML Forecasting** | ✅ Train LinearRegression on any table — forecast with 95% CI (scikit-learn) |
+| **Geographic Maps** | ✅ Choropleth (country/state) + scatter_mapbox (lat/lon) via Plotly |
+| **NL Dashboard Builder** | ✅ Describe a dashboard → auto-plans 2–4 charts → renders in 2-column grid |
 
 ---
 
@@ -102,9 +105,9 @@ User → Login / Register
 
 ### Layer breakdown
 - **Auth:** `auth/auth.py` — password hashing (SHA-256), user registration/login, per-user upload directories
-- **Frontend:** `app.py` — Streamlit with 5 tabs (Chat, My Data, Dashboard, Profiler, Auto Insights), sidebar trace, upload modes, dark/light theme
+- **Frontend:** `app.py` — Streamlit with 7 tabs (Chat, My Data, Dashboard, Profiler, Auto Insights, Documents, Dashboards), sidebar trace, upload modes, dark/light theme
 - **Orchestration:** `agent.py` — LLM tool-use loop with user-aware context (personal/shared/file mode), self-healing retry, multi-provider
-- **Tools layer:** 5 pure functions in `tools/*.py` — no LLM calls inside them
+- **Tools layer:** 10 tool functions in `tools/*.py` — no LLM calls inside them (except dashboard planner)
 - **Database abstraction:** `tools/db_manager.py` — unified interface for SQLite, PostgreSQL, MySQL, MongoDB
 - **Data layer:** SQLite sample e-commerce DB + per-user `uploads/{username}/uploads.db` + shared `uploads/shared/uploads.db`
 - **Observability:** `trace/tracer.py` — dataclass-based logger
@@ -181,7 +184,9 @@ datapilot/
 │   ├── insight_tool.py      explain_data + detect_anomalies + generate_auto_insights
 │   ├── analytics_tool.py    generate_forecast + compare_segments
 │   ├── quality_tool.py      scan_quality — nulls/duplicates/outliers
-│   └── report_tool.py       generate_report — data storytelling narrative
+│   ├── report_tool.py       generate_report — data storytelling narrative
+│   ├── ml_tool.py           auto_ml_forecast — LinearRegression with CI
+│   └── dashboard_tool.py    build_dashboard + plan_dashboard_llm — NL multi-chart builder
 ├── db/
 │   ├── seed_db.py           Sample e-commerce SQLite dataset generator
 │   ├── check_db.py          Database validation helper
@@ -344,6 +349,47 @@ New tool: `compare_data` — compares two query result sets side-by-side with ab
 
 ---
 
+## ML Forecasting
+
+New tool + UI: `auto_ml_forecast` — trains a **LinearRegression** model on any table and numeric column, then forecasts future values with 95% confidence intervals.
+
+- Available in the **Dashboards** tab under "ML Forecast"
+- Pick a table, target column, and number of periods
+- Returns: R² score, standard error, forecast table, and interactive Plotly chart with actuals + forecast + CI band
+- Works with scikit-learn (LinearRegression) — install via `pip install scikit-learn`
+
+**Example:** *"Predict sales for the next 6 months"* → agent calls `auto_ml_forecast(table="orders", target_col="order_id")` → returns forecast plot + metrics.
+
+---
+
+## Geographic Maps
+
+New chart types: **choropleth** (for country/state/region data) and **scatter_mapbox** (for lat/lon data).
+
+- Auto-detection: if the x-axis column name matches "country", "state", "region", etc., the chart automatically uses choropleth
+- If x is "lat" or "latitude", uses scatter_mapbox with OpenStreetMap tiles
+- Available in chat via `generate_chart` with `chart_type="choropleth"` or `chart_type="scatter_mapbox"`
+
+**Example:** *"Show revenue by country on a map"* → agent queries revenue grouped by country → calls `generate_chart(data, chart_type="choropleth", x="country", y="revenue")`
+
+---
+
+## NL Dashboard Builder
+
+New feature: describe a dashboard in natural language and DataPilot plans & renders 2–4 charts in a 2-column grid.
+
+- Available in the **Dashboards** tab under "NL Dashboard Builder"
+- Type a request like *"Show me monthly revenue, revenue by category, top products, and order status"*
+- Backend: `plan_dashboard_llm()` calls the LLM to generate structured chart specs → `build_dashboard()` executes SQL + renders charts
+- Charts are shown in a responsive 2-column grid with auto-sizing
+
+**Example prompts:**
+- *"Show me monthly revenue, revenue by category, top products, and order status breakdown"*
+- *"Give me a sales overview with revenue trends, category breakdown, and top customers"*
+- *"Show customer distribution by city on a map with revenue per product category"*
+
+---
+
 ## Data Storytelling Reports
 
 New tool + UI: `generate_report` combines summary statistics, top categories, and chart references into a single narrative.
@@ -398,6 +444,19 @@ These are built into the agent's system prompt (no separate UI):
 **Inventory**
 - *"Show me products with stock below 50 units"*
 - *"Which customers have placed the most orders?"*
+
+**ML Forecasting**
+- *"Predict revenue for the next 6 months"*
+- *"Forecast order volume"*
+- *"Show me monthly orders and predict next quarter"*
+
+**Geographic Maps**
+- *"Show me revenue by country on a map"*
+- *"Plot customer cities on a map"*
+
+**Dashboards**
+- *"Build me a dashboard with monthly revenue, category breakdown, top products, and order status"*
+- *"Show me a sales overview with trends, categories, and customer stats"*
 
 **Anomaly Detection**
 - *"Show me daily revenue for last week"* → then click **Data Whisperer** scan in sidebar

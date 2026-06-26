@@ -14,7 +14,9 @@ import plotly.graph_objects as go
 import streamlit as st
 from fpdf import FPDF
 
-from agent import LANGUAGES, run_agent_turn, get_llm_status
+from agent import LANGUAGES, run_agent_turn, run_agent_turn_stream, get_llm_status
+from tools.ml_tool import auto_ml_forecast
+from tools.dashboard_tool import plan_dashboard_llm, build_dashboard
 from trace.tracer import AgentTracer
 from tools.insight_tool import detect_anomalies, generate_auto_insights
 from tools.query_tool import execute_query, csv_to_table, excel_to_table, list_uploaded_tables, clear_uploads, import_db_file, drop_table, list_uploaded_files, _uploads_dir
@@ -1542,8 +1544,8 @@ with st.sidebar:
 
 # ── TABS ─────────────────────────────────────────────────────────────────
 
-tab_chat, tab_data, tab_dashboard, tab_profiler, tab_insights, tab_docs = st.tabs(
-    ["💬 Chat", "🗂️ My Data", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights", "📄 Documents"]
+tab_chat, tab_data, tab_dashboard, tab_profiler, tab_insights, tab_docs, tab_dashboards = st.tabs(
+    ["💬 Chat", "🗂️ My Data", "📌 Dashboard", "📊 Data Profiler", "🤖 Auto Insights", "📄 Documents", "📈 Dashboards"]
 )
 
 
@@ -2322,3 +2324,107 @@ with tab_docs:
         if st.button("🗑️ Clear All Documents", use_container_width=True, type="secondary"):
             clear_documents(username=_current_user)
             st.rerun()
+
+# ══════════════════════════ DASHBOARDS ═══════════════════════════════════
+
+with tab_dashboards:
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.25rem;">'
+        f'<span style="font-size:20px;font-weight:700;">📈 AI Dashboards & ML Forecasts</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Generate multi-chart dashboards from a description, or run ML forecasts on any table.")
+
+    # ── Helper to get API key ──
+    def _dash_api_key() -> str:
+        k = os.environ.get("OPENAI_API_KEY", "")
+        if not k:
+            try:
+                k = st.secrets.get("OPENAI_API_KEY", "")
+            except Exception:
+                pass
+        return k
+
+    _dash_key = _dash_api_key()
+
+    # ── ML FORECAST ──
+    st.markdown(f'<h4 style="color:{_accent};margin-top:1rem;">🤖 ML Forecast</h4>', unsafe_allow_html=True)
+    st.caption("Pick a table and numeric column to train a LinearRegression model and forecast future values.")
+
+    ml_col1, ml_col2, ml_col3, ml_col4 = st.columns([2, 2, 1, 1])
+    with ml_col1:
+        ml_table = st.text_input("Table name", value="orders", key="ml_table", label_visibility="collapsed", placeholder="Table")
+    with ml_col2:
+        ml_target = st.text_input("Target column", value="order_id", key="ml_target", label_visibility="collapsed", placeholder="Numeric column")
+    with ml_col3:
+        ml_periods = st.number_input("Periods", min_value=1, max_value=24, value=6, key="ml_periods", label_visibility="collapsed")
+    with ml_col4:
+        ml_go = st.button("🚀 Forecast", key="ml_go", use_container_width=True)
+
+    if ml_go:
+        with st.spinner("Training ML model..."):
+            ml_result = auto_ml_forecast(
+                _db_path, ml_table.strip(), ml_target.strip(),
+                periods=int(ml_periods),
+                conn_str=st.session_state.db_conn_str,
+            )
+        if ml_result.get("success"):
+            fig = go.Figure(ml_result["figure"])
+            st.plotly_chart(fig, use_container_width=True)
+            m = ml_result.get("metrics", {})
+            st.markdown(
+                f'<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:13px;">'
+                f'<span>📊 <strong>R²</strong>: {m.get("r2_score", "?")}</span>'
+                f'<span>📏 <strong>Std Error</strong>: {m.get("std_error", "?")}</span>'
+                f'<span>📦 <strong>Training rows</strong>: {m.get("training_rows", "?")}</span>'
+                f'<span>🔮 <strong>Forecast</strong>: {m.get("forecast_periods", "?")} periods</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            if ml_result.get("forecast"):
+                st.dataframe(pd.DataFrame(ml_result["forecast"]), use_container_width=True)
+        else:
+            st.warning(ml_result.get("error", "Forecast failed."))
+
+    # ── NL DASHBOARD BUILDER ──
+    st.markdown(f'<h4 style="color:{_accent2};margin-top:2rem;">📊 NL Dashboard Builder</h4>', unsafe_allow_html=True)
+    st.caption("Describe the dashboard you want — I'll plan and render multiple charts.")
+
+    dash_input = st.text_area(
+        "Dashboard description",
+        value="Show me monthly revenue, revenue by category, top products, and order status breakdown",
+        key="dash_input",
+        label_visibility="collapsed",
+        placeholder="e.g. Show me sales by region, top products, and monthly trends...",
+        height=80,
+    )
+
+    if st.button("🎯 Build Dashboard", key="build_dash", use_container_width=True, type="primary"):
+        if not _dash_key:
+            st.error("No API key configured. Set OPENAI_API_KEY in .env or sidebar Settings.")
+        elif not dash_input.strip():
+            st.warning("Please describe the dashboard you want.")
+        else:
+            with st.spinner("Planning dashboard charts..."):
+                model = os.getenv("OPENAI_MODEL", "meta/llama-3.1-70b-instruct")
+                base = os.getenv("OPENAI_BASE_URL", "https://integrate.api.nvidia.com/v1")
+                specs = plan_dashboard_llm(dash_input, _dash_key, llm_base_url=base, model=model)
+            if specs and len(specs) > 0 and "error" not in specs[0]:
+                with st.spinner("Building charts..."):
+                    dash_result = build_dashboard(specs, _db_path, conn_str=st.session_state.db_conn_str)
+                if dash_result.get("success") and dash_result.get("charts"):
+                    st.success(f"Built {len(dash_result['charts'])} charts")
+                    cols = st.columns(2)
+                    for i, ch in enumerate(dash_result["charts"]):
+                        with cols[i % 2]:
+                            if "error" in ch:
+                                st.warning(f"{ch.get('title', 'Chart')}: {ch['error']}")
+                            elif "figure" in ch:
+                                fig = go.Figure(ch["figure"])
+                                fig.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+                                st.plotly_chart(fig, use_container_width=True, key=f"dash_chart_{i}")
+                else:
+                    st.warning("No charts could be built. Check the SQL queries.")
+            else:
+                err = specs[0].get("error", "Planning failed") if specs else "No response"
+                st.error(f"Dashboard planning failed: {err}")

@@ -14,6 +14,8 @@ from tools.analytics_tool import generate_forecast, compare_segments
 from tools.quality_tool import scan_quality
 from tools.report_tool import generate_report
 from tools.rag_tool import retrieve_context
+from tools.ml_tool import auto_ml_forecast
+from tools.dashboard_tool import build_dashboard
 from tools.db_manager import DEFAULT_CONN_STRING
 from trace.tracer import AgentTracer, timed
 
@@ -191,6 +193,19 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             kw.get("question", ""),
             kw.get("chart_titles"),
         ),
+        "auto_ml_forecast": lambda **kw: auto_ml_forecast(
+            DB_PATH,
+            kw.get("table", ""),
+            kw.get("target_col", ""),
+            kw.get("date_col"),
+            int(kw.get("periods", 6)),
+            conn_str=DB_CONN_STRING,
+        ),
+        "build_dashboard": lambda **kw: build_dashboard(
+            kw.get("specs", []),
+            DB_PATH,
+            conn_str=DB_CONN_STRING,
+        ),
     }
 
 
@@ -280,6 +295,12 @@ def run_agent_turn_stream(
                 charts.append(result["figure"])
             if tool_name == "generate_flowchart" and result.get("success"):
                 diagrams.append(result["mermaid_code"])
+            if tool_name == "auto_ml_forecast" and result.get("success"):
+                charts.append(result["figure"])
+            if tool_name == "build_dashboard" and result.get("success"):
+                for c in result.get("charts", []):
+                    if "figure" in c:
+                        charts.append(c["figure"])
 
             tool_results.append({
                 "role": "tool",
@@ -414,6 +435,20 @@ UPLOADED DOCUMENTS (RAG):
   When a user asks about document content, call retrieve_context to search relevant passages.
   Combine document context with SQL results for richer answers. Always cite the source filename.
 
+MACHINE LEARNING FORECASTING:
+  You can train a simple ML model on any table to forecast numeric values.
+  Call auto_ml_forecast(table, target_col, date_col, periods) to get a forecast plot with confidence intervals.
+  Example: "Predict sales for the next 6 months" → auto_ml_forecast(table="orders_view", target_col="revenue", date_col="month", periods=6)
+
+GEOGRAPHIC MAPS:
+  You can create choropleth maps (for country/state data) and scatter_mapbox maps (for lat/lon data).
+  Use chart_type="choropleth" with a location column as x, or chart_type="scatter_mapbox" with lat/lon columns.
+
+DASHBOARDS:
+  When a user asks for a "dashboard" or "overview" of multiple metrics, plan 2-4 diverse charts
+  and call build_dashboard with the specs. Each spec needs: title, sql, chart_type, x, y.
+  Pick diverse chart types (mix of bar, line, pie, scatter, choropleth).
+
 RULES:
    1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
       This also discovers any user-uploaded tables.
@@ -466,7 +501,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "data": {"type": "array", "items": {"type": "object"}, "description": "Row dicts from execute_query."},
-                    "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "scatter", "auto"]},
+                    "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "scatter", "choropleth", "scatter_mapbox", "auto"]},
                     "x": {"type": "string", "description": "Column for x-axis / category."},
                     "y": {"type": "string", "description": "Column for y-axis / value."},
                     "title": {"type": "string", "description": "Chart title."},
@@ -586,6 +621,51 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "auto_ml_forecast",
+            "description": "Train a LinearRegression model on a table to forecast a numeric column. Returns a forecast plot with 95% confidence intervals.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "Table name to train on."},
+                    "target_col": {"type": "string", "description": "Numeric column to forecast."},
+                    "date_col": {"type": "string", "description": "Optional date column for time-based forecasting."},
+                    "periods": {"type": "integer", "description": "Number of future periods to predict (default 6)."},
+                },
+                "required": ["table", "target_col"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "build_dashboard",
+            "description": "Generate multiple charts from a list of chart specifications (each with title, sql, chart_type, x, y). Use when the user wants a multi-chart dashboard.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "specs": {
+                        "type": "array",
+                        "description": "List of chart specs: each with title, sql, chart_type, x, y.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "sql": {"type": "string"},
+                                "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "scatter", "choropleth", "scatter_mapbox"]},
+                                "x": {"type": "string"},
+                                "y": {"type": "string"},
+                            },
+                            "required": ["title", "sql", "chart_type"],
+                        },
+                    },
+                },
+                "required": ["specs"],
+            },
+        },
+    },
 ]
 
 def run_agent_turn(
@@ -676,6 +756,12 @@ def run_agent_turn(
                 charts.append(result["figure"])
             if tool_name == "generate_flowchart" and result.get("success"):
                 diagrams.append(result["mermaid_code"])
+            if tool_name == "auto_ml_forecast" and result.get("success"):
+                charts.append(result["figure"])
+            if tool_name == "build_dashboard" and result.get("success"):
+                for c in result.get("charts", []):
+                    if "figure" in c:
+                        charts.append(c["figure"])
 
             tool_results.append({
                 "role": "tool",

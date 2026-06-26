@@ -1,6 +1,7 @@
 import os
 import statistics
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+from tools.db_manager import parse_connection_string
 
 
 def prepare_explanation_context(
@@ -191,8 +192,7 @@ def _generate_auto_insights_pg(conn_str: str) -> Dict[str, Any]:
         import psycopg2
         import psycopg2.extras
 
-        from tools.db_manager import parse_connection_string
-        params = parse_conrenection_string(conn_str)
+        params = parse_connection_string(conn_str)
         pg_params = {k: v for k, v in params.items() if k != "type"}
 
         conn = psycopg2.connect(**pg_params)
@@ -284,7 +284,7 @@ def _generate_auto_insights_pg(conn_str: str) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    import json, os
+    import json
     sample = [
         {"day": "Mon", "revenue": 12000},
         {"day": "Tue", "revenue": 12500},
@@ -295,5 +295,4 @@ if __name__ == "__main__":
     print(detect_anomalies(sample, value_key="revenue", label_key="day"))
     print(prepare_explanation_context(sample, "How did revenue look this week?", persona="executive"))
     db_path = os.path.join(os.path.dirname(__file__), "..", "db", "sample_ecommerce.db")
-    import json as _json
-    print(_json.dumps(generate_auto_insights(db_path), indent=2, default=str))
+    print(json.dumps(generate_auto_insights(db_path), indent=2, default=str))

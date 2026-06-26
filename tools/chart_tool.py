@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import plotly.express as px
 
-SUPPORTED_TYPES = {"bar", "line", "pie", "scatter", "auto"}
+SUPPORTED_TYPES = {"bar", "line", "pie", "scatter", "choropleth", "scatter_mapbox", "auto"}
 
 
 def _normalize_data(data: Union[str, List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
@@ -21,6 +21,9 @@ def _normalize_data(data: Union[str, List[Dict[str, Any]]]) -> Optional[List[Dic
     return None
 
 
+_LOCATION_COLS = {"country", "countries", "nation", "state", "province", "region", "city", "location", "place"}
+
+
 def _recommend_chart_type(data: List[Dict[str, Any]], x: Optional[str], y: Optional[str]) -> str:
     if not data or not x or not y:
         return "bar"
@@ -32,6 +35,12 @@ def _recommend_chart_type(data: List[Dict[str, Any]], x: Optional[str], y: Optio
         return "bar"
 
     unique_x = len(set(x_values))
+
+    if x and x.lower() in _LOCATION_COLS and unique_x >= 2:
+        return "choropleth"
+
+    if x and x.lower() in ("lat", "latitude"):
+        return "scatter_mapbox"
 
     import re
     date_patterns = [r"\d{4}-\d{2}-\d{2}", r"\d{2}/\d{2}/\d{4}", r"\d{4}-\d{2}"]
@@ -86,6 +95,32 @@ def generate_chart(
             fig = px.pie(data, names=x, values=y, title=title, color_discrete_sequence=px.colors.qualitative.Set2)
         elif chart_type == "scatter":
             fig = px.scatter(data, x=x, y=y, title=title, trendline="lowess" if 5 <= len(data) <= 100 else None)
+        elif chart_type == "choropleth":
+            location_col = x or "location"
+            color_col = y or "value"
+            fig = px.choropleth(
+                data,
+                locations=location_col,
+                locationmode="country names",
+                color=color_col,
+                title=title,
+                color_continuous_scale=px.colors.sequential.Tealgrn,
+            )
+        elif chart_type == "scatter_mapbox":
+            lat_col = x or "lat"
+            lon_col = y or "lon"
+            size_col = next((k for k in data[0] if k not in (lat_col, lon_col)), None) if len(data) > 0 else None
+            fig = px.scatter_mapbox(
+                data,
+                lat=lat_col,
+                lon=lon_col,
+                size=size_col,
+                hover_name=size_col,
+                title=title,
+                color_continuous_scale=px.colors.sequential.Tealgrn,
+                zoom=3,
+            )
+            fig.update_layout(mapbox_style="carto-positron")
 
         if fig is not None:
             fig.update_layout(

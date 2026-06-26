@@ -8,6 +8,7 @@ fpdf2>=2.7
 openpyxl>=3.1
 chromadb>=1.5
 PyMuPDF>=1.23
+scikit-learn>=1.3
 
 # Optional: install these for extra features
 # anthropic>=0.50          # Anthropic Claude support
