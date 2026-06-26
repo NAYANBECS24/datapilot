@@ -25,6 +25,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Auto-seed database if not present (works on Streamlit Cloud)
+_db_path = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
+if not os.path.exists(_db_path):
+    try:
+        from db.seed_db import main as seed_db
+        seed_db()
+    except Exception as e:
+        pass
+
 _DEFAULT = {
     "messages": [],
     "pinned": [],
@@ -526,8 +535,7 @@ def _get_schema():
         if conn_str:
             SCHEMA_CACHE = get_schema(conn_str=conn_str)
         else:
-            p = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
-            SCHEMA_CACHE = get_schema(p)
+            SCHEMA_CACHE = get_schema(_db_path)
     return SCHEMA_CACHE
 
 def _invalidate_schema_cache():

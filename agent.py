@@ -16,6 +16,15 @@ from trace.tracer import AgentTracer, timed
 load_dotenv()
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "db", "sample_ecommerce.db")
+
+# Auto-seed database if not present (Streamlit Cloud fix)
+if not os.path.exists(DB_PATH):
+    try:
+        from db.seed_db import main as seed_db
+        seed_db()
+    except Exception:
+        pass
+
 DB_CONN_STRING = os.getenv("DATABASE_URL", "")
 MAX_SQL_RETRIES = 3
 
