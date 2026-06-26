@@ -63,15 +63,148 @@ if not st.session_state.user:
     st.markdown(f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * {{ font-family: 'Inter', sans-serif; }}
-        body {{ background: #0a0c14; }}
+        * {{ font-family: 'Inter', -apple-system, sans-serif; }}
+
+        html, body, .stApp {{
+            background: #080a16 !important;
+            margin: 0; padding: 0; overflow: hidden;
+        }}
+
+        .login-wallpaper {{
+            position: fixed; inset: 0; z-index: 0;
+            background:
+                radial-gradient(ellipse at 15% 30%, rgba(0,212,170,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 70%, rgba(124,58,237,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0,212,170,0.02) 0%, transparent 70%),
+                #080a16;
+        }}
+
+        .login-wallpaper::before {{
+            content: ''; position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 70%);
+        }}
+
+        .login-chart-bars {{
+            position: fixed; bottom: 8%; right: 6%; z-index: 0;
+            display: flex; align-items: flex-end; gap: 6px; opacity: 0.12;
+        }}
+        .login-chart-bars span {{
+            display: block; width: 14px;
+            background: linear-gradient(180deg, #00d4aa, #7c3aed);
+            border-radius: 3px 3px 0 0;
+            animation: barPulse 3s ease-in-out infinite;
+        }}
+        .login-chart-bars span:nth-child(1) {{ height: 40px; animation-delay: 0s; }}
+        .login-chart-bars span:nth-child(2) {{ height: 75px; animation-delay: 0.2s; }}
+        .login-chart-bars span:nth-child(3) {{ height: 55px; animation-delay: 0.4s; }}
+        .login-chart-bars span:nth-child(4) {{ height: 90px; animation-delay: 0.6s; }}
+        .login-chart-bars span:nth-child(5) {{ height: 30px; animation-delay: 0.8s; }}
+        .login-chart-bars span:nth-child(6) {{ height: 65px; animation-delay: 1.0s; }}
+        .login-chart-bars span:nth-child(7) {{ height: 45px; animation-delay: 1.2s; }}
+        .login-chart-bars span:nth-child(8) {{ height: 80px; animation-delay: 1.4s; }}
+
+        .login-line-chart {{
+            position: fixed; top: 12%; left: 5%; z-index: 0; opacity: 0.08;
+        }}
+        .login-line-chart svg {{ width: 200px; height: 80px; overflow: visible; }}
+        .login-line-chart path {{
+            fill: none; stroke: url(#lineGrad); stroke-width: 2;
+            stroke-dasharray: 400; stroke-dashoffset: 400;
+            animation: drawLine 4s ease-in-out infinite alternate;
+        }}
+
+        .login-dots {{
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        }}
+        .login-dot {{
+            position: absolute; width: 3px; height: 3px; border-radius: 50%;
+            background: #00d4aa; opacity: 0.15;
+            animation: dotFloat 8s ease-in-out infinite;
+        }}
+        .login-dot:nth-child(1) {{ top: 15%; left: 10%; animation-delay: 0s; width: 4px; height: 4px; }}
+        .login-dot:nth-child(2) {{ top: 40%; left: 90%; animation-delay: 1.2s; }}
+        .login-dot:nth-child(3) {{ top: 70%; left: 20%; animation-delay: 2.4s; width: 5px; height: 5px; }}
+        .login-dot:nth-child(4) {{ top: 85%; left: 75%; animation-delay: 3.6s; }}
+        .login-dot:nth-child(5) {{ top: 25%; left: 60%; animation-delay: 4.8s; width: 4px; height: 4px; }}
+        .login-dot:nth-child(6) {{ top: 55%; left: 50%; animation-delay: 6.0s; }}
+        .login-dot:nth-child(7) {{ top: 90%; left: 40%; animation-delay: 1.8s; }}
+        .login-dot:nth-child(8) {{ top: 10%; left: 80%; animation-delay: 3.0s; }}
+
+        .login-card {{
+            position: relative; z-index: 1;
+            background: rgba(10, 12, 22, 0.75) !important;
+            backdrop-filter: blur(24px) !important;
+            -webkit-backdrop-filter: blur(24px) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important;
+            border-radius: 20px !important;
+            padding: 2.5rem 2rem !important;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,170,0.04) !important;
+            width: 100%; max-width: 440px; margin: 0 auto;
+        }}
+
+        @keyframes barPulse {{
+            0%, 100% {{ transform: scaleY(1); opacity: 0.12; }}
+            50% {{ transform: scaleY(1.15); opacity: 0.2; }}
+        }}
+        @keyframes drawLine {{
+            0% {{ stroke-dashoffset: 400; }}
+            100% {{ stroke-dashoffset: 0; }}
+        }}
+        @keyframes dotFloat {{
+            0%, 100% {{ transform: translateY(0) scale(1); opacity: 0.15; }}
+            50% {{ transform: translateY(-20px) scale(1.5); opacity: 0.3; }}
+        }}
+
+        .stApp > header, #MainMenu, footer, div[data-testid="stToolbar"] {{ display: none !important; }}
+        .main > div:first-child > div:first-child {{ padding: 0 !important; max-width: 100% !important; }}
+        section[data-testid="stVerticalBlock"] > div[data-testid="element-container"] > div > div > div > div > div > div > div > div:has(.login-card) {{ width: 100% !important; }}
+        .stTabs [data-baseweb="tab-list"] {{ background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.06) !important; border-radius: 12px !important; }}
+        .stTabs [data-baseweb="tab"] {{ color: #7a7d91 !important; font-size: 13px !important; }}
+        .stTabs [aria-selected="true"] {{ background: linear-gradient(135deg,#00d4aa,#7c3aed) !important; color: #000 !important; font-weight: 600 !important; }}
+        .stTextInput > div > div {{ background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 10px !important; color: #e2e4ea !important; }}
+        .stTextInput > div > div:focus-within {{ border-color: #00d4aa !important; box-shadow: 0 0 0 1px rgba(0,212,170,0.15) !important; }}
+        .stTextInput input {{ color: #e2e4ea !important; }}
+        .stButton > button[kind="primary"] {{ background: linear-gradient(135deg,#00d4aa,#00b894) !important; border: none !important; color: #000 !important; font-weight: 600 !important; border-radius: 10px !important; }}
+        .stButton > button[kind="primary"]:hover {{ box-shadow: 0 0 30px rgba(0,212,170,0.3) !important; }}
+        .stAlert {{ background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.06) !important; }}
+        .login-footer {{ position: fixed; bottom: 0; left: 0; right: 0; z-index: 2; text-align: center; padding: 12px; font-size: 12px; color: rgba(255,255,255,0.25); background: rgba(8,10,22,0.6); backdrop-filter: blur(8px); border-top: 1px solid rgba(255,255,255,0.03); }}
     </style>
+
+    <div class="login-wallpaper"></div>
+    <div class="login-dots">
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+        <div class="login-dot"></div>
+    </div>
+    <div class="login-chart-bars">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="login-line-chart">
+        <svg viewBox="0 0 200 80">
+            <defs><linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00d4aa"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs>
+            <path d="M0,70 Q20,62 40,65 T80,40 T120,35 T160,20 T200,10"/>
+            <path d="M0,75 Q25,55 50,60 T100,30 T150,25 T200,15" stroke-dasharray="400" stroke-dashoffset="400" style="animation: drawLine 5s ease-in-out infinite alternate; animation-delay: 0.5s;"/>
+        </svg>
+    </div>
     """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
+
+    _, col2, _ = st.columns([1, 2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align:center;font-weight:800;font-size:3rem;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:2rem;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
+        st.markdown(f'<div class="login-card">', unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align:center;font-weight:800;font-size:2.5rem;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.25rem;'>DataPilot</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1.5rem;font-size:14px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
 
         tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
         with tab_log:
@@ -96,6 +229,7 @@ if not st.session_state.user:
                         st.session_state.auth_page = "login"
                     else:
                         st.error(r["error"])
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-footer">🤖 Team — <strong>Parth</strong> · iTech AI Innovation Hackathon 2026</div>', unsafe_allow_html=True)
     st.stop()
 
