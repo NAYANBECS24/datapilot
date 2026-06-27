@@ -403,7 +403,7 @@ LANGUAGES = {
     "de": "IMPORTANT: Respond in German. Use German for all explanations and summaries.",
 }
 
-SYSTEM_PROMPT_TEMPLATE = """{lang_instruction}You are DataPilot, a conversational BI copilot for a database.
+SYSTEM_PROMPT_TEMPLATE = """{lang_instruction}You are Eunoia, a conversational BI copilot for a database.
 
 TABLES AND COLUMNS (use these exact names):
 

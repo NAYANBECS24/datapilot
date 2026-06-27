@@ -1,0 +1,21 @@
+employee_id,employee_name,department,region,sales_amount,deals_closed,quarter,year
+101,Alice Johnson,Sales,North,45000,12,Q1,2025
+102,Bob Smith,Sales,South,38000,9,Q1,2025
+103,Charlie Brown,Marketing,East,22000,5,Q1,2025
+104,Diana Prince,Sales,West,52000,15,Q1,2025
+105,Eve Davis,Marketing,North,18000,4,Q1,2025
+101,Alice Johnson,Sales,North,48000,13,Q2,2025
+102,Bob Smith,Sales,South,41000,10,Q2,2025
+103,Charlie Brown,Marketing,East,25000,6,Q2,2025
+104,Diana Prince,Sales,West,56000,17,Q2,2025
+105,Eve Davis,Marketing,North,21000,5,Q2,2025
+101,Alice Johnson,Sales,North,52000,14,Q3,2025
+102,Bob Smith,Sales,South,44000,11,Q3,2025
+103,Charlie Brown,Marketing,East,28000,7,Q3,2025
+104,Diana Prince,Sales,West,61000,18,Q3,2025
+105,Eve Davis,Marketing,North,24000,6,Q3,2025
+101,Alice Johnson,Sales,North,49000,13,Q4,2025
+102,Bob Smith,Sales,South,42000,10,Q4,2025
+103,Charlie Brown,Marketing,East,26000,6,Q4,2025
+104,Diana Prince,Sales,West,58000,16,Q4,2025
+105,Eve Davis,Marketing,North,22000,5,Q4,2025

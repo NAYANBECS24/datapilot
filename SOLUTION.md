@@ -1,4 +1,4 @@
-# DataPilot — Winning Solution Document
+# Eunoia — Winning Solution Document
 ### iTech AI Innovation Hackathon 2026 · "Building Intelligent LLM Agents for Database Interaction & Visualization"
 
 > ⏰ **Timeline check:** Hackathon runs 22–28 June 2026. Today is 26 June — you have **~2 days left**. Every section below is written with that constraint in mind: a sharp, demo-ready MVP first, stretch features second. A working starter codebase implementing the core of this plan is included alongside this document (`datapilot-starter.zip`) — see Section 9.
@@ -7,7 +7,7 @@
 
 ## 1. The One-Line Pitch
 
-**DataPilot** is a conversational BI agent that doesn't just answer data questions — it **proves its own work** (live tool trace + transparent SQL), **fixes its own mistakes** (self-healing query retries), and **turns every chat into a living dashboard** (pin any chart, get proactive alerts when the data misbehaves).
+**Eunoia** is a conversational BI agent that doesn't just answer data questions — it **proves its own work** (live tool trace + transparent SQL), **fixes its own mistakes** (self-healing query retries), and **turns every chat into a living dashboard** (pin any chart, get proactive alerts when the data misbehaves).
 
 Most teams will build "ChatGPT that runs SQL." You're building **"ChatGPT that runs SQL, catches its own errors, never hallucinates a relationship diagram, and watches your data while you sleep."**
 
@@ -15,7 +15,7 @@ Most teams will build "ChatGPT that runs SQL." You're building **"ChatGPT that r
 
 ## 2. Why This Wins (mapped to the actual rubric)
 
-| Criteria | Weight | How DataPilot scores here |
+| Criteria | Weight | How Eunoia scores here |
 |---|---|---|
 | Functionality | 30% | All 5 required tools implemented and independently testable; self-healing retry loop means demo queries rarely visibly fail |
 | Tool Design & Architecture | 25% | Clean separation: tools are pure functions, agent.py only orchestrates, tracer.py gives full observability — judges can *see* the architecture, not just hear about it |
@@ -37,7 +37,7 @@ Build a ChatGPT-style app where an LLM agent can: understand natural-language da
 When `execute_query` fails (typo'd column, ambiguous join, syntax slip), the **exact database error is fed back to Claude as the tool result**, and Claude is instructed to fix and re-issue the query — automatically, within the same turn, capped at 3 retries. The user never sees a stack trace; they see a correct answer (or a clear, friendly "I couldn't find that" after genuinely exhausting retries). This single feature eliminates the #1 cause of bad hackathon demos: a query failing live in front of judges.
 
 ### 4.2 Hallucination-Proof ER Diagrams
-Most teams ask the LLM to "draw the ER diagram," and the LLM *guesses* relationships from table names — which is wrong as often as it's right. DataPilot instead extracts real foreign-key metadata via `PRAGMA foreign_key_list` and **deterministically renders** the ER diagram from that — the LLM only decides *when* to show it, never *what's* in it. Zero hallucinated relationships, every time.
+Most teams ask the LLM to "draw the ER diagram," and the LLM *guesses* relationships from table names — which is wrong as often as it's right. Eunoia instead extracts real foreign-key metadata via `PRAGMA foreign_key_list` and **deterministically renders** the ER diagram from that — the LLM only decides *when* to show it, never *what's* in it. Zero hallucinated relationships, every time.
 
 ### 4.3 Pin-to-Dashboard
 Every chart in the chat has a "📌 Pin" button. Pinned charts persist in a separate **Dashboard tab**, turning a one-off Q&A session into a reusable BI dashboard — directly satisfies the "Custom Dashboard Builder" bonus challenge with almost no extra engineering cost, because it reuses the same chart objects already being rendered in chat.
@@ -182,7 +182,7 @@ streamlit run app.py
 
 ### Pushing to GitHub
 ```bash
-git init && git add . && git commit -m "DataPilot starter"
+git init && git add . && git commit -m "Eunoia starter"
 git branch -M main
 git remote add origin https://github.com/<you>/<repo>.git
 git push -u origin main

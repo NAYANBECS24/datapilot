@@ -25,7 +25,7 @@ from tools.db_manager import DatabaseManager, validate_query
 from auth.auth import register, login, get_user
 
 st.set_page_config(
-    page_title="DataPilot · Conversational BI Agent",
+    page_title="Eunoia · Conversational BI Agent",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -212,7 +212,7 @@ if not st.session_state.user:
     st.markdown("<br>", unsafe_allow_html=True)
     lcol1, lcol2, lcol3 = st.columns([1, 1.8, 1])
     with lcol2:
-        st.markdown("<div style='text-align:center;margin-bottom:0.25rem;'><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>DataPilot</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center;margin-bottom:0.25rem;'><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'>Eunoia</span></div>", unsafe_allow_html=True)
         st.markdown("<p style='text-align:center;color:#7a7d91;margin-bottom:1rem;font-size:13px;'>Conversational BI Agent · iTech AI Hackathon 2026</p>", unsafe_allow_html=True)
 
         tab_log, tab_reg = st.tabs(["🔑 Login", "📝 Register"])
@@ -844,7 +844,7 @@ def _generate_pdf_report(messages: list) -> bytes:
     else:
         pdf.set_font("Helvetica", "", 16)
     pdf.set_text_color(0, 212, 170)
-    pdf.cell(0, 12, "DataPilot - Conversation Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 12, "Eunoia - Conversation Report", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(200, 200, 200)
     _fnt = "DejaVu" if font_path else "Helvetica"
     pdf.set_font(_fnt, "", 8)
@@ -862,7 +862,7 @@ def _generate_pdf_report(messages: list) -> bytes:
             pdf.set_text_color(220, 220, 220)
             pdf.set_font(_fnt, "", 11)
             reply = m.get("reply", "")
-            pdf.multi_cell(0, 7, f"DataPilot: {reply}", fill=True)
+            pdf.multi_cell(0, 7, f"Eunoia: {reply}", fill=True)
             for q in m.get("sql_queries", []):
                 pdf.set_font("Courier", "", 8)
                 pdf.set_text_color(100, 150, 255)
@@ -1202,7 +1202,7 @@ with st.sidebar:
         f'<div style="display:flex;align-items:center;gap:10px;padding:0.15rem 0;">'
         f'<div style="width:36px;height:36px;border-radius:10px;background:{_accent_grad};'
         f'display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📊</div>'
-        f'<div><span style="font-size:17px;font-weight:700;">Data</span><span style="font-size:17px;font-weight:700;color:{_accent};">Pilot</span>'
+        f'<div><span style="font-size:17px;font-weight:700;">Eunoia</span>'
         f'<span class="badge badge-green" style="margin-left:6px;font-size:9px;">v2</span></div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -1503,7 +1503,7 @@ with st.sidebar:
         st.caption("Share this conversation with your team.")
         share_lines = []
         for m in st.session_state.messages:
-            role = "You" if m["role"] == "user" else "DataPilot"
+            role = "You" if m["role"] == "user" else "Eunoia"
             c = m.get("reply") if m["role"] == "assistant" else m.get("content", "")
             if c:
                 share_lines.append(f"{role}: {c[:200]}")
@@ -1559,7 +1559,7 @@ with tab_chat:
         st.markdown(
             f'<div class="welcome-hero">'
             f'<h1>👋 Ask your data anything</h1>'
-            f'<p>DataPilot turns plain English into SQL, charts, and diagrams.<br>'
+            f'<p>Eunoia turns plain English into SQL, charts, and diagrams.<br>'
             f'Try one of the examples below, or type your own question.</p>'
             f'<div class="welcome-stats">'
             f'<div class="welcome-stat"><div class="welcome-stat-val">{t}</div><div class="welcome-stat-lbl">Tables</div></div>'
@@ -1698,7 +1698,7 @@ with tab_chat:
         with e1:
             lines = []
             for m in st.session_state.messages:
-                role = "**You**" if m["role"] == "user" else "**DataPilot**"
+                role = "**You**" if m["role"] == "user" else "**Eunoia**"
                 c = m.get("reply") if m["role"] == "assistant" else m.get("content", "")
                 lines.append(f"{role}: {c}")
                 for q in m.get("sql_queries", []):
@@ -1713,7 +1713,7 @@ with tab_chat:
                 if pdf_bytes:
                     st.download_button(
                         "📕 PDF Report", data=pdf_bytes,
-                        file_name="datapilot_report.pdf", mime="application/pdf", use_container_width=True,
+                        file_name="eunoia_report.pdf", mime="application/pdf", use_container_width=True,
                     )
             except Exception:
                 st.button("📕 PDF", disabled=True, use_container_width=True)
@@ -2048,7 +2048,7 @@ with tab_dashboard:
                     f"<style>body{{font-family:Inter,sans-serif;background:{_bg};color:{_text};padding:24px}}"
                     f"h1{{background:{_accent_grad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}"
                     f".chart{{margin:16px 0;background:{_card_bg};border-radius:12px;padding:12px;border:1px solid {_card_border};}}</style>"
-                    f"</head><body><h1>📊 DataPilot Dashboard</h1>"
+                    f"</head><body><h1>📊 Eunoia Dashboard</h1>"
                     f"<p>Generated {datetime.now().strftime('%b %d, %Y at %I:%M %p')}</p>"
                 ]
                 for item in st.session_state.pinned:

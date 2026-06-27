@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  datapilot:
+  eunoia:
     build: .
     ports:
       - "8501:8501"

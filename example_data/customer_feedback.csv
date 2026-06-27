@@ -1,0 +1,16 @@
+feedback_id,customer_name,product_category,rating,feedback_text,feedback_date,resolved
+1001,John Miller,Electronics,4,"Good product but battery life could be better",2025-01-15,Yes
+1002,Sarah Connor,Electronics,5,"Excellent laptop, fast delivery!",2025-01-20,Yes
+1003,Mike Ross,Clothing,3,"Sizing runs small, needs improvement",2025-02-03,No
+1004,Rachel Green,Home,5,"Love the furniture set, great quality",2025-02-10,Yes
+1005,Walter White,Electronics,2,"Product arrived damaged, very disappointed",2025-02-18,Yes
+1006,Jessie Pinkman,Books,5,"Best programming book I have ever read",2025-03-01,Yes
+1007,Donna Paulsen,Clothing,4,"Nice dress, fabric quality is good",2025-03-12,No
+1008,Harvey Specter,Electronics,5,"Premium headphones, crystal clear sound",2025-03-20,Yes
+1009,Lois Lane,Home,4,"Decent kitchen set, value for money",2025-04-02,Yes
+1010,Peter Parker,Electronics,1,"Phone stopped working after a week",2025-04-10,Yes
+1011,Clark Kent,Books,5,"Fantastic novel, could not put it down",2025-04-18,Yes
+1012,Bruce Wayne,Electronics,4,"Smartwatch is good but needs frequent charging",2025-05-01,No
+1013,Tony Stark,Automotive,5,"Best car accessories, highly recommend",2025-05-10,Yes
+1014,Natasha Romanoff,Clothing,3,"Average quality, overpriced",2025-05-22,No
+1015,Steve Rogers,Home,5,"Amazing sofa set, very comfortable",2025-06-01,Yes

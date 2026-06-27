@@ -1,5 +1,5 @@
 [project]
-name = "datapilot"
+name = "eunoia"
 version = "2.0.0"
 description = "Conversational BI Agent — NL to SQL, charts, diagrams, self-healing agent"
 authors = [{ name = "iTech Hackathon 2026 Team" }]
@@ -20,4 +20,4 @@ anthropic = ["anthropic>=0.50"]
 all = ["psycopg2-binary>=2.9", "pymysql>=1.1", "anthropic>=0.50"]
 
 [project.urls]
-Homepage = "https://github.com/NAYANBECS24/datapilot"
+Homepage = "https://github.com/NAYANBECS24/eunoia"

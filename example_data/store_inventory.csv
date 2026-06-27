@@ -1,0 +1,16 @@
+product_id,product_name,category,stock_quantity,reorder_level,unit_price,supplier,last_restock_date
+P001,Wireless Mouse,Electronics,120,25,2999,Dell Distributors,2025-05-10
+P002,USB-C Hub,Electronics,45,30,1499,Tech Supplies Inc,2025-05-15
+P003,Office Chair,Furniture,18,10,8999,FurniWorld,2025-04-20
+P004,Desk Lamp,Furniture,67,20,1999,LightingPlus,2025-05-25
+P005,Bluetooth Speaker,Electronics,32,15,4499,SoundPro Ltd,2025-05-30
+P006,Yoga Mat,Sports,200,50,999,FitGear Co,2025-06-01
+P007,Dumbbell Set,Sports,25,10,5999,FitGear Co,2025-05-05
+P008,Notebook Pack,Stationery,500,100,249,PaperWorld,2025-06-10
+P009,Whiteboard,Stationery,12,10,1299,PaperWorld,2025-04-15
+P010,Water Bottle,Sports,350,50,499,FitGear Co,2025-06-05
+P011,Mechanical Keyboard,Electronics,8,20,5499,KeyCrafters,2025-03-20
+P012,Standing Desk,Furniture,5,5,24999,ErgoWorks,2025-04-10
+P013,LED Strip Lights,Electronics,90,30,799,LightingPlus,2025-06-08
+P014,Protein Powder,Sports,42,20,1999,SupplementHub,2025-05-28
+P015,Printer Paper,Stationery,1000,200,499,PaperWorld,2025-06-12

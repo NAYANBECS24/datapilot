@@ -1,4 +1,4 @@
-# DataPilot — Conversational BI Agent
+# Eunoia — Conversational BI Agent
 
 **iTech AI Innovation Hackathon 2026** · *"Building Intelligent LLM Agents for Database Interaction & Visualization"*
 
@@ -6,8 +6,7 @@
 
 Chat in plain English → agent writes & runs SQL → renders charts/diagrams → explains insights. Built with self-healing SQL, real-time streaming, transparent agent traces, glassmorphism UI, and a living pinned dashboard.
 
-[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
-[![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)](https://github.com/NAYANBECS24/datapilot)
+[![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)](https://github.com/NAYANBECS24/eunoia)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -68,8 +67,8 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/NAYANBECS24/datapilot.git
-cd datapilot
+git clone https://github.com/NAYANBECS24/eunoia.git
+cd eunoia
 python -m venv venv
 # Windows: venv\Scripts\activate
 # Mac/Linux: source venv/bin/activate
@@ -101,8 +100,6 @@ streamlit run app.py
 ```
 
 Open **http://localhost:8501**
-
-**Live demo:** [datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
 
 ---
 
@@ -164,7 +161,7 @@ User → Login / Register
 
 ## Project Structure
 ```
-datapilot/
+eunoia/
 ├── app.py                   Streamlit UI (7 tabs, sidebar, auth gate, uploads)
 ├── agent.py                 LLM orchestration (tool loop, streaming, retry, 12 tools)
 ├── .streamlit/
@@ -173,6 +170,10 @@ datapilot/
 ├── auth/
 │   ├── __init__.py
 │   └── auth.py              Login/register with SHA-256, auto-seed defaults, per-user dirs
+├── example_data/
+│   ├── employee_sales.csv    Sample employee sales performance data
+│   ├── customer_feedback.csv Sample customer feedback & ratings
+│   └── store_inventory.csv   Sample store inventory data
 ├── tools/
 │   ├── __init__.py
 │   ├── db_manager.py        Multi-DB abstraction (SQLite/PostgreSQL/MySQL/MongoDB)
@@ -226,7 +227,7 @@ python -m pytest tests/ -v       # 85 tests, all passing
 
 ## Login & Multi-User Portal
 
-DataPilot starts with a login/register screen. Users must sign up before accessing the app.
+Eunoia starts with a login/register screen. Users must sign up before accessing the app.
 
 - **Login page:** Full-screen animated CSS wallpaper (gradient background, data grid overlay, chart bars, line chart, floating dots) with glassmorphism card (`backdrop-filter: blur(24px)`)
 - **Registration:** Username (min 3 chars) + password (min 4 chars), stored with SHA-256 hashing in `auth/users.db`
@@ -325,9 +326,23 @@ Same flow as CSV. Optionally specify a sheet name. Uses openpyxl.
 
 ---
 
+## Example Data for Upload Testing
+
+Eunoia comes with sample CSV files in the `example_data/` folder you can upload to test the system:
+
+| File | Description | Sample Queries |
+|---|---|---|
+| `employee_sales.csv` | Employee sales performance by quarter | *"Show me top sales employees by region"*, *"Who had the highest sales in Q3?"* |
+| `customer_feedback.csv` | Product reviews and ratings | *"What's the average rating per product category?"*, *"Show me unresolved complaints"* |
+| `store_inventory.csv` | Store stock levels and suppliers | *"Which products are below reorder level?"*, *"Show me total stock value by category"* |
+
+Upload any of these via **Sidebar → Upload CSV** and query them instantly.
+
+---
+
 ## RAG — Document Search (Retrieval-Augmented Generation)
 
-DataPilot searches **unstructured documents** using vector embeddings — no external API needed.
+Eunoia searches **unstructured documents** using vector embeddings — no external API needed.
 
 **How it works:**
 1. Upload a PDF/TXT/MD file via **Sidebar → Upload Document**
@@ -399,7 +414,7 @@ Two new map chart types in the agent's toolkit:
 
 ## NL Dashboard Builder
 
-Describe a dashboard in natural language — DataPilot plans 2–4 diverse charts and renders them in a responsive 2-column grid.
+Describe a dashboard in natural language — Eunoia plans 2–4 diverse charts and renders them in a responsive 2-column grid.
 
 - Available in the **Dashboards** tab
 - Backend: `plan_dashboard_llm()` → LLM generates structured chart specs → `build_dashboard()` executes SQL + renders Plotly charts
@@ -430,7 +445,7 @@ If `execute_query` returns an error, the agent automatically retries with a corr
 
 ## Smart Query Suggestions
 
-When the chat is empty, DataPilot reads the actual database schema and generates relevant questions dynamically (e.g., "Show me revenue by Electronics" if the Electronics category exists). Falls back to 8 static examples if the schema read fails.
+When the chat is empty, Eunoia reads the actual database schema and generates relevant questions dynamically (e.g., "Show me revenue by Electronics" if the Electronics category exists). Falls back to 8 static examples if the schema read fails.
 
 ---
 
@@ -483,6 +498,12 @@ When the chat is empty, DataPilot reads the actual database schema and generates
 - *"What does the uploaded report say about revenue growth?"*
 - *"Summarize the key findings from the uploaded document"*
 
+### Uploaded Data (try with example_data CSVs)
+- *"Show me top sales employees by region"*
+- *"Which products are below reorder level?"*
+- *"What's the average rating per product category?"*
+- *"Show me unresolved customer complaints"*
+
 ---
 
 ## Tech Stack
@@ -503,7 +524,7 @@ When the chat is empty, DataPilot reads the actual database schema and generates
 
 ## Streaming Responses
 
-DataPilot streams responses word-by-word for a ChatGPT-like experience:
+Eunoia streams responses word-by-word for a ChatGPT-like experience:
 - Tool calls run under a spinner (typically 1–3 seconds)
 - Final reply streams with 15ms word-level animation via `st.write_stream()`
 - Charts, diagrams, and SQL render immediately after streaming completes
@@ -566,7 +587,7 @@ Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak 
 
 1. Push this repo to GitHub:
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/datapilot.git
+git remote add origin https://github.com/YOUR_USERNAME/eunoia.git
 git push -u origin master
 ```
 
