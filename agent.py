@@ -437,8 +437,12 @@ UPLOADED DOCUMENTS (RAG):
 
 MACHINE LEARNING FORECASTING:
   You can train a simple ML model on any table to forecast numeric values.
-  Call auto_ml_forecast(table, target_col, date_col, periods) to get a forecast plot with confidence intervals.
-  Example: "Predict sales for the next 6 months" → auto_ml_forecast(table="orders_view", target_col="revenue", date_col="month", periods=6)
+  Option A — forecast_data: First execute a SQL query to get time-series data, then pass the result rows to forecast_data(data, date_col, value_col, periods).
+    Example: "Predict sales for the next 6 months" → first run SQL: SELECT strftime('%Y-%m', order_date) AS month, SUM(quantity * unit_price) AS revenue FROM orders JOIN order_items USING(order_id) GROUP BY month ORDER BY month
+    Then call: forecast_data(data=<query_result_rows>, date_col="month", value_col="revenue", periods=6)
+  Option B — auto_ml_forecast: Call auto_ml_forecast(table, target_col, date_col, periods) directly on existing table columns.
+    Works on tables with numeric columns like order_items (quantity, unit_price) or payments (amount).
+    Example: "Forecast order quantities" → auto_ml_forecast(table="order_items", target_col="quantity", date_col="order_date", periods=6)
 
 GEOGRAPHIC MAPS:
   You can create choropleth maps (for country/state data) and scatter_mapbox maps (for lat/lon data).

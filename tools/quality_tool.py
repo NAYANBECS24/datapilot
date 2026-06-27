@@ -23,7 +23,13 @@ def scan_quality(db_path: str) -> Dict[str, Any]:
             dup_count = 0
             outlier_cols = []
 
+            intentional_null_cols = {
+                "shipping": {"shipped_date", "delivered_date"},
+            }
+            skip_nulls = intentional_null_cols.get(table, set())
             for c in cols:
+                if c in skip_nulls:
+                    continue
                 nulls = cur.execute(f'SELECT COUNT(*) FROM "{table}" WHERE "{c}" IS NULL').fetchone()[0]
                 if nulls:
                     null_counts[c] = nulls
