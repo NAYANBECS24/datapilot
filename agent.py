@@ -462,6 +462,9 @@ def run_agent_turn_stream(
                 diagrams.append(result["mermaid_code"])
             if tool_name == "auto_ml_forecast" and result.get("success"):
                 charts.append(result["figure"])
+            if tool_name == "forecast_data" and result.get("success"):
+                if result.get("figure"):
+                    charts.append(result["figure"])
             if tool_name == "build_dashboard" and result.get("success"):
                 for c in result.get("charts", []):
                     if "figure" in c:
@@ -949,6 +952,9 @@ def run_agent_turn(
                 diagrams.append(result["mermaid_code"])
             if tool_name == "auto_ml_forecast" and result.get("success"):
                 charts.append(result["figure"])
+            if tool_name == "forecast_data" and result.get("success"):
+                if result.get("figure"):
+                    charts.append(result["figure"])
             if tool_name == "build_dashboard" and result.get("success"):
                 for c in result.get("charts", []):
                     if "figure" in c:

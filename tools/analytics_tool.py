@@ -34,13 +34,33 @@ def generate_forecast(data: List[Dict[str, Any]], date_col: str = "", value_col:
             except ValueError:
                 pass
 
+        hist = [{"date": d, "value": v} for d, v in zip(dates, values)]
+        fcast = [{"date": d, "value": v} for d, v in zip(future_dates, forecasted)]
+
+        import plotly.graph_objects as go
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=[p["date"] for p in hist], y=[p["value"] for p in hist],
+            mode="lines+markers", name="Historical", line=dict(color="#00d4aa"),
+        ))
+        fig.add_trace(go.Scatter(
+            x=[p["date"] for p in fcast], y=[p["value"] for p in fcast],
+            mode="lines+markers", name="Forecast", line=dict(color="#7c3aed", dash="dash"),
+        ))
+        fig.update_layout(
+            title=f"Forecast ({'up' if coeffs[0] > 0 else 'down'} trend)",
+            xaxis_title=date_col, yaxis_title=value_col,
+            hovermode="x unified",
+        )
+
         return {
             "success": True,
-            "historical": [{"date": d, "value": v} for d, v in zip(dates, values)],
-            "forecast": [{"date": d, "value": v} for d, v in zip(future_dates, forecasted)],
+            "historical": hist,
+            "forecast": fcast,
             "coefficients": [round(float(c), 4) for c in coeffs],
             "trend": "up" if coeffs[0] > 0 else ("down" if coeffs[0] < 0 else "flat"),
             "next_prediction": forecasted[0],
+            "figure": fig.to_dict(),
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
