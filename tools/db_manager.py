@@ -55,6 +55,15 @@ def validate_query(sql: str) -> Dict[str, Any]:
 
     if "limit" not in lowered:
         cleaned = f"{cleaned} LIMIT {DEFAULT_ROW_LIMIT}"
+    else:
+        import re
+        limit_match = re.search(r"\blimit\s+(\d+|(\d+)\s*,\s*(\d+))", lowered)
+        if not limit_match:
+            return {
+                "valid": False,
+                "reason": "LIMIT clause found but no valid integer limit value specified (e.g. LIMIT 10). Specify a number after LIMIT.",
+                "sql": cleaned,
+            }
 
     return {"valid": True, "reason": None, "sql": cleaned}
 

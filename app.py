@@ -1306,7 +1306,7 @@ with st.sidebar:
                     f'<div class="trace-line">'
                     f'<div class="trace-dot {dot}"></div>'
                     f'<div class="trace-name">{icon} {ev["tool_name"]}</div>'
-                    f'<div class="trace-detail">{ev["input_summary"][:40]}</div>'
+                    f'<div class="trace-detail">{ev["input_summary"][:80]}</div>'
                     f'{detail}'
                     f'<div class="trace-meta">step {ev["step"]} · {ev["latency_ms"]}ms</div>'
                     f'</div>'
