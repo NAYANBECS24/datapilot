@@ -220,7 +220,7 @@ if not st.session_state.user:
             with st.form("login_form"):
                 lun = st.text_input("Username", placeholder="Enter your username")
                 lpw = st.text_input("Password", type="password", placeholder="Enter your password")
-                if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                if st.form_submit_button("Login", width="stretch", type="primary"):
                     r = login(lun, lpw)
                     if r["success"]:
                         st.session_state.user = r["username"]
@@ -232,7 +232,7 @@ if not st.session_state.user:
             with st.form("register_form"):
                 run = st.text_input("Choose a username", placeholder="Min 3 characters")
                 rpw = st.text_input("Choose a password", type="password", placeholder="Min 4 characters")
-                if st.form_submit_button("Register", use_container_width=True, type="primary"):
+                if st.form_submit_button("Register", width="stretch", type="primary"):
                     r = register(run, rpw)
                     if r["success"]:
                         st.success("Registered! Login now.")
@@ -1012,7 +1012,7 @@ def _show_data_preview(username: str, table_name: str):
         df = pd.read_sql(f'SELECT * FROM "{table_name}" LIMIT 5', conn)
         conn.close()
         st.markdown("**Preview:**")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
     except Exception:
         pass
 
@@ -1114,32 +1114,32 @@ def _render_table_card(t: dict, db_path: str = "", can_delete: bool = False, mod
             y_default = numeric_cols[1] if len(numeric_cols) > 1 else numeric_cols[0]
             chart_key = f"qt_{mode_user}_{t['table_name']}"
             with qc1:
-                if st.button("📊 Bar", key=f"{chart_key}_bar", use_container_width=True):
+                if st.button("📊 Bar", key=f"{chart_key}_bar", width="stretch"):
                     fig = _quick_chart(t["table_name"], db_path, "bar", x_default, y_default)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_bar_fig", config={"displaylogo": False})
+                        st.plotly_chart(fig, width="stretch", key=f"{chart_key}_bar_fig", config={"displaylogo": False})
             with qc2:
-                if st.button("📈 Line", key=f"{chart_key}_line", use_container_width=True):
+                if st.button("📈 Line", key=f"{chart_key}_line", width="stretch"):
                     fig = _quick_chart(t["table_name"], db_path, "line", x_default, y_default)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_line_fig", config={"displaylogo": False})
+                        st.plotly_chart(fig, width="stretch", key=f"{chart_key}_line_fig", config={"displaylogo": False})
             with qc3:
-                if st.button("🥧 Pie", key=f"{chart_key}_pie", use_container_width=True):
+                if st.button("🥧 Pie", key=f"{chart_key}_pie", width="stretch"):
                     fig = _quick_chart(t["table_name"], db_path, "pie", x_default, y_default)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_pie_fig", config={"displaylogo": False})
+                        st.plotly_chart(fig, width="stretch", key=f"{chart_key}_pie_fig", config={"displaylogo": False})
             with qc4:
-                if st.button("🔵 Scatter", key=f"{chart_key}_scatter", use_container_width=True):
+                if st.button("🔵 Scatter", key=f"{chart_key}_scatter", width="stretch"):
                     fig = _quick_chart(t["table_name"], db_path, "scatter", x_default, y_default)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key=f"{chart_key}_scatter_fig", config={"displaylogo": False})
+                        st.plotly_chart(fig, width="stretch", key=f"{chart_key}_scatter_fig", config={"displaylogo": False})
 
         with st.expander(f"🔍 Preview ({t['table_name']})", expanded=False):
             try:
                 conn = sqlite3.connect(db_path)
                 df = pd.read_sql(f'SELECT * FROM "{t["table_name"]}" LIMIT 10', conn)
                 conn.close()
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width="stretch", hide_index=True)
             except Exception as e:
                 st.caption(f"Could not load preview: {e}")
 
@@ -1230,7 +1230,7 @@ with st.sidebar:
 
     with st.expander("👤 Account", expanded=True):
         st.markdown(f'<span style="font-size:13px;">Logged in as <strong>{st.session_state.user}</strong></span>', unsafe_allow_html=True)
-        if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+        if st.button("🚪 Logout", width="stretch", type="secondary"):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
             st.query_params.clear()
@@ -1240,13 +1240,13 @@ with st.sidebar:
     with u1:
         st.session_state.upload_mode = "personal" if st.button(
             "👤 Personal" if st.session_state.upload_mode != "personal" else "✅ Personal",
-            use_container_width=True,
+            width="stretch",
             key="mode_personal",
         ) else st.session_state.upload_mode
     with u2:
         st.session_state.upload_mode = "shared" if st.button(
             "🌐 Shared" if st.session_state.upload_mode != "shared" else "✅ Shared",
-            use_container_width=True,
+            width="stretch",
             key="mode_shared",
         ) else st.session_state.upload_mode
 
@@ -1265,12 +1265,12 @@ with st.sidebar:
             chats = _list_chats(u)
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("➕ New Chat", use_container_width=True):
+                if st.button("➕ New Chat", width="stretch"):
                     _save_chat(u)
                     _new_chat(u)
                     st.rerun()
             with c2:
-                if st.button("💾 Save", use_container_width=True):
+                if st.button("💾 Save", width="stretch"):
                     _save_chat(u)
                     st.toast("Chat saved")
             if chats:
@@ -1278,7 +1278,7 @@ with st.sidebar:
                     cc1, cc2 = st.columns([4, 1])
                     with cc1:
                         title = ch["title"][:22] + ("…" if len(ch["title"]) > 22 else "")
-                        if st.button(f"{title} ({ch['msg_count']} msgs)", key=f"chat_{ch['id']}", use_container_width=True):
+                        if st.button(f"{title} ({ch['msg_count']} msgs)", key=f"chat_{ch['id']}", width="stretch"):
                             _load_chat(u, ch["id"])
                             st.rerun()
                     with cc2:
@@ -1318,16 +1318,16 @@ with st.sidebar:
     with st.expander("⚙️ Settings", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("🌙 Dark" if not st.session_state.dark_mode else "☀️ Light", use_container_width=True):
+            if st.button("🌙 Dark" if not st.session_state.dark_mode else "☀️ Light", width="stretch"):
                 st.session_state.dark_mode = not st.session_state.dark_mode
                 st.rerun()
         with c2:
             lbl = "🔍 SQL ON" if st.session_state.show_sql else "🔍 SQL OFF"
-            if st.button(lbl, use_container_width=True):
+            if st.button(lbl, width="stretch"):
                 st.session_state.show_sql = not st.session_state.show_sql
         with c3:
             lbl2 = "🎤 Voice ON" if st.session_state.voice_mode else "🎤 Voice OFF"
-            if st.button(lbl2, use_container_width=True):
+            if st.button(lbl2, width="stretch"):
                 st.session_state.voice_mode = not st.session_state.voice_mode
 
         if not llm_status["connected"]:
@@ -1381,7 +1381,7 @@ with st.sidebar:
         uploaded_csv = st.file_uploader("Choose CSV file", type=["csv"], label_visibility="collapsed", key="csv_upload")
         if uploaded_csv:
             tbl = st.text_input("Table name", value=uploaded_csv.name.replace(".csv", "").replace(" ", "_").lower())
-            if st.button("Import CSV", use_container_width=True):
+            if st.button("Import CSV", width="stretch"):
                 import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
                 tmp.write(uploaded_csv.getbuffer())
@@ -1391,7 +1391,8 @@ with st.sidebar:
                 if r["success"]:
                     st.success(f"Imported {r['row_count']} rows!")
                     _show_data_preview(_current_user, tbl)
-                    st.info("Now ask: 'Show me first 10 rows from my.{tbl}' or click chart presets in My Data tab")
+                    prefix = "my" if _current_user else "uploads"
+                    st.info(f"Now ask: 'Show me first 10 rows from {prefix}.{tbl}' or click chart presets in My Data tab")
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
@@ -1402,7 +1403,7 @@ with st.sidebar:
         if uploaded_xl:
             tbl = st.text_input("Table name", value=uploaded_xl.name.replace(".xlsx", "").replace(".xls", "").replace(" ", "_").lower())
             sheet = st.text_input("Sheet name (leave blank for first sheet)", value="")
-            if st.button("Import Excel", use_container_width=True):
+            if st.button("Import Excel", width="stretch"):
                 import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                 tmp.write(uploaded_xl.getbuffer())
@@ -1412,7 +1413,8 @@ with st.sidebar:
                 if r["success"]:
                     st.success(f"Imported {r['row_count']} rows from sheet '{r['sheet']}'!")
                     _show_data_preview(_current_user, tbl)
-                    st.info("Now ask: 'Show me from my.{tbl}' or click chart presets in My Data tab")
+                    prefix = "my" if _current_user else "uploads"
+                    st.info(f"Now ask: 'Show me from {prefix}.{tbl}' or click chart presets in My Data tab")
                     st.session_state.auto_insights = None
                 else:
                     st.error(r["error"])
@@ -1422,7 +1424,7 @@ with st.sidebar:
         uploaded_db = st.file_uploader("Choose .db file", type=["db", "sqlite", "sqlite3"], label_visibility="collapsed", key="db_upload")
         if uploaded_db:
             label = st.text_input("Label (optional)", value=uploaded_db.name.replace(".db", "").replace(".sqlite", "").replace(" ", "_").lower())
-            if st.button("Import DB", use_container_width=True):
+            if st.button("Import DB", width="stretch"):
                 import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
                 tmp.write(uploaded_db.getbuffer())
@@ -1440,7 +1442,7 @@ with st.sidebar:
         st.markdown(f'<span style="font-size:12px;color:{_text2};">Upload PDF, TXT, or Markdown files. The agent can search them using RAG. Ask: "What does the report say about X?"</span>', unsafe_allow_html=True)
         uploaded_doc = st.file_uploader("Choose document", type=["pdf", "txt", "md", "json"], label_visibility="collapsed", key="doc_upload")
         if uploaded_doc:
-            if st.button("Index Document", use_container_width=True):
+            if st.button("Index Document", width="stretch"):
                 import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_doc.name.split('.')[-1]}")
                 tmp.write(uploaded_doc.getbuffer())
@@ -1472,7 +1474,7 @@ with st.sidebar:
         else:
             st.caption("No uploaded files yet.")
 
-    if st.button("🗑️ Clear Uploads" + _upload_label, use_container_width=True, type="secondary"):
+    if st.button("🗑️ Clear Uploads" + _upload_label, width="stretch", type="secondary"):
         clear_uploads(username=_current_user)
         st.session_state.auto_insights = None
         st.rerun()
@@ -1484,7 +1486,7 @@ with st.sidebar:
             if m["role"] == "assistant" and m.get("data_rows"):
                 last = m
                 break
-        if last and st.button("Scan anomalies", use_container_width=True):
+        if last and st.button("Scan anomalies", width="stretch"):
             rows = last["data_rows"]
             cols = last["data_cols"]
             if rows and cols:
@@ -1508,7 +1510,7 @@ with st.sidebar:
             if c:
                 share_lines.append(f"{role}: {c[:200]}")
         share_text = "\n\n".join(share_lines) if share_lines else "No conversation yet."
-        if st.button("📋 Copy to Clipboard", use_container_width=True):
+        if st.button("📋 Copy to Clipboard", width="stretch"):
             st.toast("📋 Copied to clipboard!")
             st.markdown(
                 f'<textarea id="share-box" style="position:fixed;left:-9999px;">{share_text}</textarea>'
@@ -1575,7 +1577,7 @@ with tab_chat:
                 if st.button(
                     f"{icon} **{title}**\n\n{query}",
                     key=f"wc_{i}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state._recall = query
         st.markdown("</div>", unsafe_allow_html=True)
@@ -1612,18 +1614,18 @@ with tab_chat:
                     with col_s1:
                         st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
                     with col_s2:
-                        if st.button("✏️ Edit", key=f"{sql_key}_edit", use_container_width=True):
+                        if st.button("✏️ Edit", key=f"{sql_key}_edit", width="stretch"):
                             st.session_state[f"{sql_key}_editing"] = not st.session_state.get(f"{sql_key}_editing", False)
                     with col_s3:
-                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", use_container_width=True):
+                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", width="stretch"):
                             st.session_state[f"{sql_key}_explain"] = True
                     if st.session_state.get(f"{sql_key}_editing"):
                         new_sql = st.text_area("Edit SQL", value=qinfo["sql"], key=f"{sql_key}_ta", height=100)
-                        if st.button("▶️ Run", key=f"{sql_key}_run", use_container_width=True):
-                            r = execute_query(_db_path, new_sql)
+                        if st.button("▶️ Run", key=f"{sql_key}_run", width="stretch"):
+                            r = execute_query(_db_path, new_sql, username=_current_user)
                             if r.get("success"):
                                 st.success(f"{r['row_count']} rows returned")
-                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), use_container_width=True, hide_index=True)
+                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), width="stretch", hide_index=True)
                             else:
                                 st.error(r.get("error", "Query failed."))
                     if st.session_state.get(f"{sql_key}_explain"):
@@ -1643,11 +1645,11 @@ with tab_chat:
                 fig = go.Figure(fig_dict)
                 apply_chart_theme(fig)
                 fig.update_layout(height=340)
-                st.plotly_chart(fig, use_container_width=True, key=f"c_{idx}_{i}", config={"displaylogo": False})
+                st.plotly_chart(fig, width="stretch", key=f"c_{idx}_{i}", config={"displaylogo": False})
 
                 bar_cols = st.columns(4)
                 with bar_cols[0]:
-                    if st.button("📌 Pin", key=f"pin_{idx}_{i}", use_container_width=True):
+                    if st.button("📌 Pin", key=f"pin_{idx}_{i}", width="stretch"):
                         title = fig_dict.get("layout", {}).get("title", {}).get("text", "Untitled")
                         st.session_state.pinned.append({"title": title, "figure": fig_dict})
                         st.toast(f"📌 Pinned '{title}'")
@@ -1705,7 +1707,7 @@ with tab_chat:
                     lines.append(f"> ```sql\n> {q['sql']}\n> ```")
             st.download_button(
                 "📥 Markdown", data="\n\n".join(lines).encode(),
-                file_name="chat.md", mime="text/markdown", use_container_width=True,
+                file_name="chat.md", mime="text/markdown", width="stretch",
             )
         with e2:
             try:
@@ -1713,10 +1715,10 @@ with tab_chat:
                 if pdf_bytes:
                     st.download_button(
                         "📕 PDF Report", data=pdf_bytes,
-                        file_name="eunoia_report.pdf", mime="application/pdf", use_container_width=True,
+                        file_name="eunoia_report.pdf", mime="application/pdf", width="stretch",
                     )
             except Exception:
-                st.button("📕 PDF", disabled=True, use_container_width=True)
+                st.button("📕 PDF", disabled=True, width="stretch")
 
     # ── SUGGESTION PILLS (compact, shown when chatting) ──
     if has_msgs:
@@ -1728,7 +1730,7 @@ with tab_chat:
                 if idx < len(SUGGESTION_CHIPS[:6]):
                     with cols[j]:
                         short = SUGGESTION_CHIPS[idx][:20] + ("…" if len(SUGGESTION_CHIPS[idx]) > 20 else "")
-                        if st.button(short, key=f"sp_{idx}", use_container_width=True):
+                        if st.button(short, key=f"sp_{idx}", width="stretch"):
                             st.session_state._recall = SUGGESTION_CHIPS[idx]
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1848,18 +1850,18 @@ with tab_chat:
                     with col_s1:
                         st.caption(f"↳ {qinfo['row_count']} rows · {qinfo['latency_ms']} ms")
                     with col_s2:
-                        if st.button("✏️ Edit", key=f"{sql_key}_edit", use_container_width=True):
+                        if st.button("✏️ Edit", key=f"{sql_key}_edit", width="stretch"):
                             st.session_state[f"{sql_key}_editing"] = not st.session_state.get(f"{sql_key}_editing", False)
                     with col_s3:
-                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", use_container_width=True):
+                        if st.button("💡 Explain SQL", key=f"{sql_key}_expl", width="stretch"):
                             st.session_state[f"{sql_key}_explain"] = True
                     if st.session_state.get(f"{sql_key}_editing"):
                         new_sql = st.text_area("Edit SQL", value=qinfo["sql"], key=f"{sql_key}_ta", height=100)
-                        if st.button("▶️ Run", key=f"{sql_key}_run", use_container_width=True):
-                            r = execute_query(_db_path, new_sql)
+                        if st.button("▶️ Run", key=f"{sql_key}_run", width="stretch"):
+                            r = execute_query(_db_path, new_sql, username=_current_user)
                             if r.get("success"):
                                 st.success(f"{r['row_count']} rows returned")
-                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), use_container_width=True, hide_index=True)
+                                st.dataframe(pd.DataFrame(r["rows"], columns=r["columns"]), width="stretch", hide_index=True)
                             else:
                                 st.error(r.get("error", "Query failed."))
                     if st.session_state.get(f"{sql_key}_explain"):
@@ -1874,11 +1876,11 @@ with tab_chat:
                 fig = go.Figure(fig_dict)
                 apply_chart_theme(fig)
                 fig.update_layout(height=340)
-                st.plotly_chart(fig, use_container_width=True, key=f"new_c_{i}", config={"displaylogo": False})
+                st.plotly_chart(fig, width="stretch", key=f"new_c_{i}", config={"displaylogo": False})
 
                 bar_cols = st.columns(4)
                 with bar_cols[0]:
-                    if st.button("📌 Pin", key=f"new_pin_{i}", use_container_width=True):
+                    if st.button("📌 Pin", key=f"new_pin_{i}", width="stretch"):
                         title = fig_dict.get("layout", {}).get("title", {}).get("text", "Untitled")
                         st.session_state.pinned.append({"title": title, "figure": fig_dict})
                         st.toast(f"📌 Pinned '{title}'")
@@ -1985,7 +1987,7 @@ with tab_data:
                 for t in info["tables"]:
                     _render_table_card(t, db_path=up_path, can_delete=can_del, mode_user=mode_user)
                 if can_del:
-                    if st.button(f"🗑️ Clear All — {mode_user}", key=f"clear_{mode_user}", use_container_width=True):
+                    if st.button(f"🗑️ Clear All — {mode_user}", key=f"clear_{mode_user}", width="stretch"):
                         clear_uploads(username=mode_user)
                         st.session_state.auto_insights = None
                         st.rerun()
@@ -2023,7 +2025,7 @@ with tab_dashboard:
                 fig = go.Figure(item["figure"])
                 apply_chart_theme(fig)
                 fig.update_layout(height=260, margin=dict(l=8, r=8, t=8, b=8))
-                st.plotly_chart(fig, use_container_width=True, key=f"d_{i}", config={"displayModeBar": False})
+                st.plotly_chart(fig, width="stretch", key=f"d_{i}", config={"displayModeBar": False})
 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -2034,7 +2036,7 @@ with tab_dashboard:
                     except Exception:
                         pass
                 with c2:
-                    if st.button("🗑️", key=f"rm_{i}", use_container_width=True):
+                    if st.button("🗑️", key=f"rm_{i}", width="stretch"):
                         st.session_state.pinned.pop(i)
                         st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -2056,9 +2058,9 @@ with tab_dashboard:
                     apply_chart_theme(fig)
                     html.append(f"<div class='chart'><h3>{item['title']}</h3>{fig.to_html(full_html=False, include_plotlyjs='cdn')}</div>")
                 html.append("</body></html>")
-                st.download_button("📥 Export HTML", data="\n".join(html).encode(), file_name="dashboard.html", mime="text/html", use_container_width=True)
+                st.download_button("📥 Export HTML", data="\n".join(html).encode(), file_name="dashboard.html", mime="text/html", width="stretch")
             with c2:
-                if st.button("Clear All", use_container_width=True):
+                if st.button("Clear All", width="stretch"):
                     st.session_state.pinned = []
                     st.rerun()
 
@@ -2073,7 +2075,7 @@ with tab_profiler:
     )
     st.caption("Select a table to inspect its schema, stats, and sample data.")
 
-    sr = get_schema(_db_path)
+    sr = get_schema(_db_path, username=_current_user)
 
     if sr.get("success"):
         tables = list(sr["schema"]["tables"].keys())
@@ -2081,7 +2083,7 @@ with tab_profiler:
 
         if selected:
             with st.spinner(f"Profiling `{selected}`..."):
-                r = execute_query(_db_path, f"SELECT * FROM {selected} LIMIT 1000")
+                r = execute_query(_db_path, f"SELECT * FROM {selected} LIMIT 1000", username=_current_user)
                 if r.get("success"):
                     rows, cols = r["rows"], r["columns"]
                     df = pd.DataFrame(rows, columns=cols)
@@ -2109,10 +2111,10 @@ with tab_profiler:
                         else:
                             sts = f"top={df[c].mode().iloc[0] if nn > 0 else '-'}"
                         cd.append({"Column": c, "Type": dt, "Non-Null": f"{nn}/{len(df)}", "Unique": uq, "Stats": sts})
-                    st.dataframe(pd.DataFrame(cd), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(cd), width="stretch", hide_index=True)
 
                     with st.expander("📋 Sample Data", expanded=False):
-                        st.dataframe(df.head(10), use_container_width=True, hide_index=True)
+                        st.dataframe(df.head(10), width="stretch", hide_index=True)
 
                     csv_b = df.describe(include="all").to_csv().encode()
                     st.download_button("⬇ Profile CSV", data=csv_b, file_name=f"{selected}_profile.csv", mime="text/csv")
@@ -2123,7 +2125,7 @@ with tab_profiler:
 
     with st.expander("🔍 Data Quality Scanner", expanded=False):
         st.caption("Scan all tables for nulls, duplicates, and outlier values.")
-        if st.button("Scan Quality", use_container_width=True):
+        if st.button("Scan Quality", width="stretch"):
             from tools.quality_tool import scan_quality
             qr = scan_quality(_db_path)
             if qr.get("success"):
@@ -2157,7 +2159,7 @@ with tab_insights:
     )
     st.caption("Multi-perspective report on your data — metrics, trends, anomalies, and recommendations.")
 
-    if st.button("🔄 Generate Report", use_container_width=True, type="primary"):
+    if st.button("🔄 Generate Report", width="stretch", type="primary"):
         with st.spinner("Running analysis..."):
             st.session_state.auto_insights = generate_auto_insights(_db_path)
 
@@ -2191,28 +2193,28 @@ with tab_insights:
                     if "month" in df.columns and "revenue" in df.columns:
                         fig = px.line(df, x="month", y="revenue", title="Monthly Revenue", markers=True)
                         apply_chart_theme(fig)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                 if trends.get("category_revenue"):
                     df = pd.DataFrame(trends["category_revenue"])
                     if "category" in df.columns and "revenue" in df.columns:
                         fig = px.pie(df, values="revenue", names="category", title="Revenue by Category")
                         apply_chart_theme(fig)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                 if trends.get("order_status"):
                     df = pd.DataFrame(trends["order_status"])
                     if "status" in df.columns and "count" in df.columns:
                         fig = px.bar(df, x="status", y="count", title="Orders by Status", color="status")
                         apply_chart_theme(fig)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                 if trends.get("top_products"):
                     df = pd.DataFrame(trends["top_products"])
                     if "name" in df.columns and "revenue" in df.columns:
                         fig = px.bar(df, x="revenue", y="name", title="Top Products", orientation="h")
                         apply_chart_theme(fig)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
             anomalies = rpt.get("anomalies", [])
             if anomalies:
@@ -2246,7 +2248,7 @@ with tab_insights:
     with st.expander("📖 Data Storytelling Report", expanded=False):
         st.caption("Generate a narrative report combining multiple perspectives into one story.")
         report_driver = st.text_input("Focus area (e.g. 'sales performance', 'customer behavior')", placeholder="What story do you want to tell?")
-        if st.button("Generate Story", use_container_width=True) and report_driver:
+        if st.button("Generate Story", width="stretch") and report_driver:
             with st.spinner("Building your data story..."):
                 from tools.report_tool import generate_report
                 from tools.insight_tool import generate_auto_insights
@@ -2303,7 +2305,7 @@ with tab_docs:
                 with c2:
                     st.markdown(f"`{d['size_kb']} KB`")
                 with c3:
-                    if st.button("🔍 Chunks", key=f"chk_{d['id']}", use_container_width=True):
+                    if st.button("🔍 Chunks", key=f"chk_{d['id']}", width="stretch"):
                         st.session_state[f"show_chunks_{d['id']}"] = not st.session_state.get(f"show_chunks_{d['id']}", False)
                 with c4:
                     if st.button("🗑️", key=f"del_doc_{d['id']}", help="Delete"):
@@ -2321,7 +2323,7 @@ with tab_docs:
                         st.caption("No chunks found.")
                 st.divider()
 
-        if st.button("🗑️ Clear All Documents", use_container_width=True, type="secondary"):
+        if st.button("🗑️ Clear All Documents", width="stretch", type="secondary"):
             clear_documents(username=_current_user)
             st.rerun()
 
@@ -2359,7 +2361,7 @@ with tab_dashboards:
     with ml_col3:
         ml_periods = st.number_input("Periods", min_value=1, max_value=24, value=6, key="ml_periods", label_visibility="collapsed")
     with ml_col4:
-        ml_go = st.button("🚀 Forecast", key="ml_go", use_container_width=True)
+        ml_go = st.button("🚀 Forecast", key="ml_go", width="stretch")
 
     if ml_go:
         with st.spinner("Training ML model..."):
@@ -2370,7 +2372,7 @@ with tab_dashboards:
             )
         if ml_result.get("success"):
             fig = go.Figure(ml_result["figure"])
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             m = ml_result.get("metrics", {})
             st.markdown(
                 f'<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:13px;">'
@@ -2382,7 +2384,7 @@ with tab_dashboards:
                 unsafe_allow_html=True,
             )
             if ml_result.get("forecast"):
-                st.dataframe(pd.DataFrame(ml_result["forecast"]), use_container_width=True)
+                st.dataframe(pd.DataFrame(ml_result["forecast"]), width="stretch")
         else:
             st.warning(ml_result.get("error", "Forecast failed."))
 
@@ -2399,7 +2401,7 @@ with tab_dashboards:
         height=80,
     )
 
-    if st.button("🎯 Build Dashboard", key="build_dash", use_container_width=True, type="primary"):
+    if st.button("🎯 Build Dashboard", key="build_dash", width="stretch", type="primary"):
         if not _dash_key:
             st.error("No API key configured. Set OPENAI_API_KEY in .env or sidebar Settings.")
         elif not dash_input.strip():
@@ -2411,7 +2413,7 @@ with tab_dashboards:
                 specs = plan_dashboard_llm(dash_input, _dash_key, llm_base_url=base, model=model)
             if specs and len(specs) > 0 and "error" not in specs[0]:
                 with st.spinner("Building charts..."):
-                    dash_result = build_dashboard(specs, _db_path, conn_str=st.session_state.db_conn_str)
+                    dash_result = build_dashboard(specs, _db_path, conn_str=st.session_state.db_conn_str, username=_current_user)
                 if dash_result.get("success") and dash_result.get("charts"):
                     st.success(f"Built {len(dash_result['charts'])} charts")
                     cols = st.columns(2)
@@ -2422,7 +2424,7 @@ with tab_dashboards:
                             elif "figure" in ch:
                                 fig = go.Figure(ch["figure"])
                                 fig.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
-                                st.plotly_chart(fig, use_container_width=True, key=f"dash_chart_{i}")
+                                st.plotly_chart(fig, width="stretch", key=f"dash_chart_{i}")
                 else:
                     st.warning("No charts could be built. Check the SQL queries.")
             else:

@@ -22,7 +22,12 @@ def _uploads_db(username: str = "") -> str:
     return os.path.join(_uploads_dir(username), "uploads.db")
 
 
-def execute_query(db_path: Optional[str] = None, sql: str = "", conn_str: Optional[str] = None) -> Dict[str, Any]:
+def execute_query(
+    db_path: Optional[str] = None,
+    sql: str = "",
+    conn_str: Optional[str] = None,
+    username: str = "",
+) -> Dict[str, Any]:
     if conn_str and not conn_str.lower().startswith("sqlite"):
         mgr = DatabaseManager(conn_str)
     elif db_path:
@@ -38,22 +43,35 @@ def execute_query(db_path: Optional[str] = None, sql: str = "", conn_str: Option
 
     if mgr.db_type == "sqlite":
         db_file = db_path or mgr.params.get("database", "")
-        return _sqlite_execute(db_file, safe_sql)
+        return _sqlite_execute(db_file, safe_sql, username=username)
     else:
         return mgr.execute_query(sql)
 
 
-def _sqlite_execute(db_path: str, sql: str) -> Dict[str, Any]:
+def _attach_sqlite_db(conn: sqlite3.Connection, alias: str, path: str, main_db_path: str = "") -> None:
+    if not path or not os.path.exists(path):
+        return
+    try:
+        if main_db_path and os.path.abspath(path) == os.path.abspath(main_db_path):
+            return
+    except Exception:
+        pass
+    escaped = path.replace("'", "''")
+    conn.execute(f"ATTACH DATABASE '{escaped}' AS {alias}")
+
+
+def _sqlite_execute(db_path: str, sql: str, username: str = "") -> Dict[str, Any]:
     import time
     start = time.perf_counter()
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
 
-        uploads_db = os.path.join(_UPLOADS_BASE, "shared", "uploads.db") if db_path else ""
-        if uploads_db and os.path.exists(uploads_db):
+        if db_path:
             try:
-                conn.execute(f"ATTACH DATABASE '{uploads_db.replace(chr(39), chr(39)+chr(39))}' AS uploads")
+                if username.strip():
+                    _attach_sqlite_db(conn, "my", _uploads_db(username), db_path)
+                _attach_sqlite_db(conn, "uploads", os.path.join(_UPLOADS_BASE, "shared", "uploads.db"), db_path)
             except Exception:
                 pass
 
@@ -69,7 +87,10 @@ def _sqlite_execute(db_path: str, sql: str) -> Dict[str, Any]:
             "rows": [dict(r) for r in rows], "row_count": len(rows), "latency_ms": latency_ms,
         }
     except sqlite3.Error as e:
-        return {"success": False, "sql": sql, "error": str(e)}
+        err = str(e)
+        if "syntax error" in err.lower() and "limit" in err.lower():
+            err += " The SQL query appears to be malformed. Rewrite the complete query — do not truncate any clause. Use full table names, not aliases, and ensure all JOINs have ON conditions."
+        return {"success": False, "sql": sql, "error": err}
 
 
 def excel_to_table(file_path: str, table_name: str, sheet_name: str = "", username: str = "") -> Dict[str, Any]:

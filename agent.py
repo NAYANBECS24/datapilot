@@ -33,8 +33,145 @@ if not os.path.exists(DB_PATH):
 
 DB_CONN_STRING = os.getenv("DATABASE_URL", "")
 MAX_SQL_RETRIES = 3
+MAX_TOOL_ITERATIONS = 8
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia").lower()
+
+
+class _LocalToolCall:
+    """OpenAI-shaped tool call used when a model returns raw JSON text."""
+
+    def __init__(self, name: str, arguments: Dict[str, Any], tool_id: str):
+        self.type = "function"
+        self.id = tool_id
+        self.function = type("func", (), {"name": name, "arguments": json.dumps(arguments)})()
+
+
+def _tool_names() -> set:
+    return {
+        t.get("function", {}).get("name")
+        for t in TOOLS
+        if t.get("type") == "function" and t.get("function", {}).get("name")
+    }
+
+
+def _json_from_text(text: str) -> Any:
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        stripped = "\n".join(lines).strip()
+
+    candidates = [stripped]
+    for open_char, close_char in (("{", "}"), ("[", "]")):
+        start = stripped.find(open_char)
+        end = stripped.rfind(close_char)
+        if start != -1 and end > start:
+            candidates.append(stripped[start:end + 1])
+
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return None
+
+
+def _coerce_tool_arguments(raw: Any) -> Dict[str, Any]:
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if not raw:
+            return {}
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _raw_tool_calls_from_obj(obj: Any) -> List[_LocalToolCall]:
+    calls: List[_LocalToolCall] = []
+    names = _tool_names()
+
+    def visit(node: Any):
+        if isinstance(node, list):
+            for item in node:
+                visit(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        for key in ("tool_calls", "tools"):
+            if isinstance(node.get(key), list):
+                visit(node[key])
+
+        function = node.get("function")
+        name = node.get("name") or node.get("tool") or node.get("tool_name")
+        raw_args = node.get("parameters", node.get("arguments", node.get("input", {})))
+
+        if isinstance(function, dict):
+            name = function.get("name") or name
+            raw_args = function.get("arguments", raw_args)
+
+        if name in names:
+            tool_id = str(node.get("id") or f"raw_call_{len(calls) + 1}")
+            calls.append(_LocalToolCall(name, _coerce_tool_arguments(raw_args), tool_id))
+
+    visit(obj)
+    return calls
+
+
+def _coerce_message_tool_calls(msg: Any) -> tuple[List[Any], bool]:
+    structured = getattr(msg, "tool_calls", None)
+    if structured:
+        return list(structured), False
+
+    raw_calls = _raw_tool_calls_from_obj(_json_from_text(getattr(msg, "content", "") or ""))
+    return raw_calls, bool(raw_calls)
+
+
+def _tool_call_id(tc: Any, fallback: str) -> str:
+    if isinstance(tc, dict):
+        return str(tc.get("id") or fallback)
+    return str(getattr(tc, "id", fallback) or fallback)
+
+
+def _tool_call_name(tc: Any) -> str:
+    if isinstance(tc, dict):
+        function = tc.get("function") or {}
+        return function.get("name") or tc.get("name") or ""
+    return getattr(getattr(tc, "function", None), "name", "")
+
+
+def _tool_call_input(tc: Any) -> Dict[str, Any]:
+    if isinstance(tc, dict):
+        function = tc.get("function") or {}
+        raw_args = function.get("arguments", tc.get("arguments", tc.get("parameters", {})))
+    else:
+        raw_args = getattr(getattr(tc, "function", None), "arguments", {})
+    return _coerce_tool_arguments(raw_args)
+
+
+def _tool_call_message(tc: Any, fallback: str) -> Dict[str, Any]:
+    return {
+        "id": _tool_call_id(tc, fallback),
+        "type": "function",
+        "function": {
+            "name": _tool_call_name(tc),
+            "arguments": json.dumps(_tool_call_input(tc)),
+        },
+    }
 
 
 def _resolve_api_key() -> str:
@@ -147,12 +284,12 @@ def _chunk_text(text: str, size: int = 5) -> List[str]:
         yield " ".join(words[i:i + size]) + " "
 
 
-def _forecast_with_sql(kw: dict) -> dict:
+def _forecast_with_sql(kw: dict, username: str = "") -> dict:
     data_raw = kw.get("data")
     sql = kw.get("sql", "").strip()
     if sql or (isinstance(data_raw, str) and data_raw.strip().lower().startswith("select")):
         sql_to_run = sql or data_raw.strip()
-        result = execute_query(DB_PATH, sql_to_run, conn_str=DB_CONN_STRING)
+        result = execute_query(DB_PATH, sql_to_run, conn_str=DB_CONN_STRING, username=username)
         if not result.get("success"):
             return {"success": False, "error": f"SQL execution failed: {result.get('error', '')}"}
         data = result.get("rows", [])
@@ -173,7 +310,7 @@ def _forecast_with_sql(kw: dict) -> dict:
 def _build_tool_impl(username: str = "") -> Dict[str, Any]:
     return {
         "get_schema": lambda **kw: get_schema(DB_PATH, conn_str=DB_CONN_STRING, username=username),
-        "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", ""), conn_str=DB_CONN_STRING),
+        "execute_query": lambda **kw: execute_query(DB_PATH, kw.get("sql", ""), conn_str=DB_CONN_STRING, username=username),
         "generate_chart": lambda **kw: generate_chart(
             _normalise_data(kw.get("data", [])),
             kw.get("chart_type", "bar"),
@@ -194,7 +331,7 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             kw.get("user_question", ""),
             kw.get("persona", "analyst"),
         ),
-        "forecast_data": lambda **kw: _forecast_with_sql(kw),
+        "forecast_data": lambda **kw: _forecast_with_sql(kw, username=username),
         "compare_data": lambda **kw: compare_segments(
             _normalise_data(kw.get("data_a", [])),
             _normalise_data(kw.get("data_b", [])),
@@ -223,6 +360,7 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             kw.get("specs", []),
             DB_PATH,
             conn_str=DB_CONN_STRING,
+            username=username,
         ),
     }
 
@@ -259,6 +397,7 @@ def run_agent_turn_stream(
     diagrams = []
     sql_queries = []
     sql_retry_count = 0
+    tool_iterations = 0
 
     while True:
         try:
@@ -267,7 +406,8 @@ def run_agent_turn_stream(
             yield {"type": "reply", "content": f"⚠️ Sorry, I encountered an error contacting the LLM provider (**{LLM_PROVIDER}**).\n\n> {e}\n\nPlease check your API key and try again."}
             return
 
-        if not msg.tool_calls:
+        tool_calls, raw_tool_calls = _coerce_message_tool_calls(msg)
+        if not tool_calls:
             yield {"type": "charts", "content": charts}
             yield {"type": "diagrams", "content": diagrams}
             yield {"type": "sql_queries", "content": sql_queries}
@@ -277,15 +417,22 @@ def run_agent_turn_stream(
             yield {"type": "stream_end", "content": ""}
             return
 
-        messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": msg.tool_calls})
+        tool_iterations += 1
+        if tool_iterations > MAX_TOOL_ITERATIONS:
+            yield {"type": "reply", "content": "I ran too many tool steps without reaching a final answer. Please try a narrower question."}
+            return
+
+        messages.append({
+            "role": "assistant",
+            "content": "" if raw_tool_calls else msg.content or "",
+            "tool_calls": [_tool_call_message(tc, f"call_{i}") for i, tc in enumerate(tool_calls)],
+        })
         tool_results = []
 
-        for tc in msg.tool_calls:
-            tool_name = tc.function.name
-            try:
-                tool_input = json.loads(tc.function.arguments) if tc.function.arguments else {}
-            except json.JSONDecodeError:
-                tool_input = {}
+        for i, tc in enumerate(tool_calls):
+            tool_name = _tool_call_name(tc)
+            tool_input = _tool_call_input(tc)
+            tool_call_id = _tool_call_id(tc, f"call_{i}")
 
             with timed() as t:
                 fn = tool_impl.get(tool_name)
@@ -322,7 +469,7 @@ def run_agent_turn_stream(
 
             tool_results.append({
                 "role": "tool",
-                "tool_call_id": tc.id,
+                "tool_call_id": tool_call_id,
                 "content": json.dumps(result)[:8000],
             })
 
@@ -493,11 +640,12 @@ RULES:
         filename. You can combine document context with database results.
     13. KEEP REASONING BRIEF: Do not write long chains of thought before calling a tool.
         Call the tool immediately — tool arguments must be complete and never truncated.
-    14. When writing SQL, write the complete query including FROM, JOIN, WHERE, GROUP BY,
-        and LIMIT clauses. Never let the SQL be cut short.
-    15. Use full table names in SQL (e.g. "products" not "p" or "T1"). Avoid table aliases
-        entirely — SQLite handles full table names fine in JOINs. Always verify LIMIT has
-        a numeric value like LIMIT 10, never LIMIT alone.
+    14. CRITICAL — SQL COMPLETENESS: When writing SQL, write the ENTIRE query in one go.
+        Never truncate or abbreviate. Every clause (SELECT, FROM, JOIN ... ON, WHERE, GROUP BY,
+        HAVING, ORDER BY, LIMIT) must be fully written. Incomplete SQL causes execution errors.
+    15. NEVER use table aliases (like T1, T2, p, oi, c, o). Always write full table names:
+        "products", "order_items", "customers", "orders". SQLite handles full names fine in JOINs.
+        The query validator rejects queries with missing JOIN conditions.
 """
 
 TOOLS = [
@@ -730,6 +878,7 @@ def run_agent_turn(
     diagrams: List[str] = []
     sql_queries: List[Dict[str, Any]] = []
     sql_retry_count = 0
+    tool_iterations = 0
 
     while True:
         try:
@@ -742,7 +891,8 @@ def run_agent_turn(
                 "sql_queries": sql_queries,
             }
 
-        if not msg.tool_calls:
+        tool_calls, raw_tool_calls = _coerce_message_tool_calls(msg)
+        if not tool_calls:
             return {
                 "reply": msg.content or "",
                 "charts": charts,
@@ -750,15 +900,26 @@ def run_agent_turn(
                 "sql_queries": sql_queries,
             }
 
-        messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": msg.tool_calls})
+        tool_iterations += 1
+        if tool_iterations > MAX_TOOL_ITERATIONS:
+            return {
+                "reply": "I ran too many tool steps without reaching a final answer. Please try a narrower question.",
+                "charts": charts,
+                "diagrams": diagrams,
+                "sql_queries": sql_queries,
+            }
+
+        messages.append({
+            "role": "assistant",
+            "content": "" if raw_tool_calls else msg.content or "",
+            "tool_calls": [_tool_call_message(tc, f"call_{i}") for i, tc in enumerate(tool_calls)],
+        })
         tool_results = []
 
-        for tc in msg.tool_calls:
-            tool_name = tc.function.name
-            try:
-                tool_input = json.loads(tc.function.arguments) if tc.function.arguments else {}
-            except json.JSONDecodeError:
-                tool_input = {}
+        for i, tc in enumerate(tool_calls):
+            tool_name = _tool_call_name(tc)
+            tool_input = _tool_call_input(tc)
+            tool_call_id = _tool_call_id(tc, f"call_{i}")
 
             with timed() as t:
                 fn = tool_impl.get(tool_name)
@@ -795,7 +956,7 @@ def run_agent_turn(
 
             tool_results.append({
                 "role": "tool",
-                "tool_call_id": tc.id,
+                "tool_call_id": tool_call_id,
                 "content": json.dumps(result)[:8000],
             })
 

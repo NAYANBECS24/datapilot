@@ -46,7 +46,8 @@ def get_schema(db_path: Optional[str] = None, conn_str: Optional[str] = None, us
                 schema["tables"][table] = {"columns": columns, "foreign_keys": []}
 
             conn.close()
-            _merge_uploads(schema, db_path, username)
+            result = {"success": True, "schema": schema}
+            _merge_uploads(result, db_path, username)
             return {"success": True, "schema": schema}
         except Exception as e:
             return {"success": False, "error": str(e)}

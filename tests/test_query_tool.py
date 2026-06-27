@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from tools.query_tool import execute_query, validate_query, clear_uploads
+from tools.query_tool import execute_query, validate_query, clear_uploads, csv_to_table
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "sample_ecommerce.db")
 
@@ -88,6 +88,28 @@ class TestExecuteQuery(unittest.TestCase):
         r = execute_query(DB_PATH, "SELECT * FROM products LIMIT 3")
         dumped = json.dumps(r, default=str)
         self.assertIsInstance(dumped, str)
+
+    def test_can_query_personal_uploaded_table_alias(self):
+        username = "__test_query_upload__"
+        clear_uploads(username=username)
+        csv_path = os.path.join(os.path.dirname(__file__), "_tmp_upload.csv")
+        try:
+            with open(csv_path, "w", encoding="utf-8") as f:
+                f.write("name,amount\nA,10\nB,20\n")
+            imported = csv_to_table(csv_path, "sales_upload", username=username)
+            self.assertTrue(imported["success"])
+
+            r = execute_query(
+                DB_PATH,
+                "SELECT SUM(amount) AS total FROM my.sales_upload",
+                username=username,
+            )
+            self.assertTrue(r["success"])
+            self.assertEqual(r["rows"][0]["total"], 30)
+        finally:
+            if os.path.exists(csv_path):
+                os.remove(csv_path)
+            clear_uploads(username=username)
 
 
 class TestExecuteQueryJoin(unittest.TestCase):

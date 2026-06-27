@@ -44,8 +44,8 @@ def validate_query(sql: str) -> Dict[str, Any]:
     if not lowered.startswith("select") and not lowered.startswith("with"):
         return {"valid": False, "reason": "Only read-only SELECT/WITH queries are permitted.", "sql": cleaned}
 
+    import re
     for kw in BLOCKED_KEYWORDS:
-        import re
         if re.search(rf"\b{kw}\b", lowered):
             return {
                 "valid": False,
@@ -53,10 +53,28 @@ def validate_query(sql: str) -> Dict[str, Any]:
                 "sql": cleaned,
             }
 
+    open_parens = cleaned.count("(")
+    close_parens = cleaned.count(")")
+    if open_parens != close_parens:
+        return {
+            "valid": False,
+            "reason": f"Unbalanced parentheses ({open_parens} open, {close_parens} close) — the SQL appears incomplete or truncated. Rewrite the complete query with all closing parentheses.",
+            "sql": cleaned,
+        }
+
+    join_count = len(re.findall(r'\bJOIN\b', cleaned, re.IGNORECASE))
+    on_count = len(re.findall(r'\bON\b', cleaned, re.IGNORECASE))
+    using_count = len(re.findall(r'\bUSING\b', cleaned, re.IGNORECASE))
+    if join_count > on_count + using_count:
+        return {
+            "valid": False,
+            "reason": f"Missing ON/USING clause after JOIN (found {join_count} JOIN(s) but only {on_count + using_count} ON/USING). The SQL appears truncated — write the complete query with all JOIN conditions (e.g. JOIN products ON ...).",
+            "sql": cleaned,
+        }
+
     if "limit" not in lowered:
         cleaned = f"{cleaned} LIMIT {DEFAULT_ROW_LIMIT}"
     else:
-        import re
         limit_match = re.search(r"\blimit\s+(\d+|(\d+)\s*,\s*(\d+))", lowered)
         if not limit_match:
             return {

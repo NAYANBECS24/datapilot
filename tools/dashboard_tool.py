@@ -10,6 +10,7 @@ def build_dashboard(
     specs: List[Dict[str, Any]],
     db_path: str,
     conn_str: str = "",
+    username: str = "",
 ) -> Dict[str, Any]:
     if not specs:
         return {"success": False, "error": "No chart specs provided.", "charts": []}
@@ -26,7 +27,7 @@ def build_dashboard(
             charts.append({"error": f"Chart {i+1}: no SQL query.", "title": title})
             continue
 
-        result = execute_query(db_path, sql, conn_str=conn_str)
+        result = execute_query(db_path, sql, conn_str=conn_str, username=username)
         if not result.get("success"):
             charts.append({"error": f"Chart {i+1}: {result.get('error', 'query failed')}", "title": title})
             continue
