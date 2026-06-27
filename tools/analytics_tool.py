@@ -2,6 +2,15 @@ import json
 from typing import Any, Dict, List
 
 
+def _json_default(o):
+    if hasattr(o, 'tolist'):
+        return o.tolist()
+    try:
+        return str(o)
+    except Exception:
+        return None
+
+
 def generate_forecast(data: List[Dict[str, Any]], date_col: str = "", value_col: str = "", periods: int = 5) -> Dict[str, Any]:
     if not data or not date_col or not value_col:
         return {"success": False, "error": "data, date_col, and value_col are required."}
@@ -53,6 +62,8 @@ def generate_forecast(data: List[Dict[str, Any]], date_col: str = "", value_col:
             hovermode="x unified",
         )
 
+        raw_fig = fig.to_dict()
+        figure = json.loads(json.dumps(raw_fig, default=_json_default))
         return {
             "success": True,
             "historical": hist,
@@ -60,7 +71,7 @@ def generate_forecast(data: List[Dict[str, Any]], date_col: str = "", value_col:
             "coefficients": [round(float(c), 4) for c in coeffs],
             "trend": "up" if coeffs[0] > 0 else ("down" if coeffs[0] < 0 else "flat"),
             "next_prediction": forecasted[0],
-            "figure": fig.to_dict(),
+            "figure": figure,
         }
     except Exception as e:
         return {"success": False, "error": str(e)}

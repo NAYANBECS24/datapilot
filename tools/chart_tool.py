@@ -3,6 +3,15 @@ from typing import Any, Dict, List, Optional, Union
 
 import plotly.express as px
 
+
+def _json_default(o):
+    if hasattr(o, 'tolist'):
+        return o.tolist()
+    try:
+        return str(o)
+    except Exception:
+        return None
+
 SUPPORTED_TYPES = {"bar", "line", "pie", "scatter", "choropleth", "scatter_mapbox", "auto"}
 
 
@@ -129,10 +138,13 @@ def generate_chart(
                 hovermode="x unified",
             )
 
+        raw_fig = fig.to_dict() if fig else {}
+        import json as _json
+        figure = _json.loads(_json.dumps(raw_fig, default=_json_default))
         return {
             "success": True,
             "chart_type": chart_type,
-            "figure": fig.to_dict() if fig else {},
+            "figure": figure,
             "recommendation_note": note,
         }
     except Exception as e:

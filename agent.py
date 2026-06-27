@@ -3,6 +3,22 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
+
+def _json_default(o):
+    if hasattr(o, 'tolist'):
+        return o.tolist()
+    try:
+        return str(o)
+    except Exception:
+        return None
+
+
+def _safe_json_dumps(val: Any, maxlen: int = 8000) -> str:
+    try:
+        return json.dumps(val, default=_json_default)[:maxlen]
+    except Exception:
+        return json.dumps({"error": "result could not be serialized"})
+
 from dotenv import load_dotenv
 
 from tools.schema_tool import get_schema
@@ -473,7 +489,7 @@ def run_agent_turn_stream(
             tool_results.append({
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": json.dumps(result)[:8000],
+                "content": _safe_json_dumps(result),
             })
 
         messages.extend(tool_results)
@@ -963,7 +979,7 @@ def run_agent_turn(
             tool_results.append({
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": json.dumps(result)[:8000],
+                "content": _safe_json_dumps(result),
             })
 
         messages.extend(tool_results)
