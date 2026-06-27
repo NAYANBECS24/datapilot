@@ -147,6 +147,22 @@ def _chunk_text(text: str, size: int = 5) -> List[str]:
         yield " ".join(words[i:i + size]) + " "
 
 
+def _forecast_with_sql(kw: dict) -> dict:
+    sql = kw.get("sql", "").strip()
+    if sql:
+        result = execute_query(DB_PATH, sql, conn_str=DB_CONN_STRING)
+        if not result.get("success"):
+            return {"success": False, "error": f"SQL execution failed: {result.get('error', '')}"}
+        data = result.get("rows", [])
+    else:
+        data = _normalise_data(kw.get("data", []))
+    return generate_forecast(
+        data,
+        kw.get("date_col", ""),
+        kw.get("value_col", ""),
+        int(kw.get("periods", 5)),
+    )
+
 def _build_tool_impl(username: str = "") -> Dict[str, Any]:
     return {
         "get_schema": lambda **kw: get_schema(DB_PATH, conn_str=DB_CONN_STRING, username=username),
@@ -171,12 +187,7 @@ def _build_tool_impl(username: str = "") -> Dict[str, Any]:
             kw.get("user_question", ""),
             kw.get("persona", "analyst"),
         ),
-        "forecast_data": lambda **kw: generate_forecast(
-            _normalise_data(kw.get("data", [])),
-            kw.get("date_col", ""),
-            kw.get("value_col", ""),
-            kw.get("periods", 5),
-        ),
+        "forecast_data": lambda **kw: _forecast_with_sql(kw),
         "compare_data": lambda **kw: compare_segments(
             _normalise_data(kw.get("data_a", [])),
             _normalise_data(kw.get("data_b", [])),
@@ -437,9 +448,9 @@ UPLOADED DOCUMENTS (RAG):
 
 MACHINE LEARNING FORECASTING:
   You can train a simple ML model on any table to forecast numeric values.
-  Option A — forecast_data: First execute a SQL query to get time-series data, then pass the result rows to forecast_data(data, date_col, value_col, periods).
-    Example: "Predict sales for the next 6 months" → first run SQL: SELECT strftime('%Y-%m', order_date) AS month, SUM(quantity * unit_price) AS revenue FROM orders JOIN order_items USING(order_id) GROUP BY month ORDER BY month
-    Then call: forecast_data(data=<query_result_rows>, date_col="month", value_col="revenue", periods=6)
+  Option A — forecast_data: Pass a SQL query and column names to forecast_data(sql, date_col, value_col, periods).
+    The tool executes the SQL internally and forecasts from the results.
+    Example: "Predict sales for the next 6 months" → forecast_data(sql="SELECT strftime('%Y-%m', order_date) AS month, SUM(quantity * unit_price) AS revenue FROM orders JOIN order_items USING(order_id) GROUP BY month ORDER BY month", date_col="month", value_col="revenue", periods=6)
   Option B — auto_ml_forecast: Call auto_ml_forecast(table, target_col, date_col, periods) directly on existing table columns.
     Works on tables with numeric columns like order_items (quantity, unit_price) or payments (amount).
     Example: "Forecast order quantities" → auto_ml_forecast(table="order_items", target_col="quantity", date_col="order_date", periods=6)
@@ -560,16 +571,17 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "forecast_data",
-            "description": "Predict future values from time-series data using trend forecasting.",
+            "description": "Predict future values from time-series data. Pass the SQL result data array, OR provide a SQL query to execute first.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "data": {"type": "array", "items": {"type": "object"}},
+                    "data": {"type": "array", "items": {"type": "object"}, "description": "Row dicts from execute_query result. Required unless 'sql' is provided."},
                     "date_col": {"type": "string", "description": "Column with dates."},
                     "value_col": {"type": "string", "description": "Column with numeric values to forecast."},
                     "periods": {"type": "integer", "description": "Number of future periods to predict (default 5)."},
+                    "sql": {"type": "string", "description": "Alternative to 'data': a SQL query that returns time-series data with date_col and value_col. The query is executed first, then forecast runs on results."},
                 },
-                "required": ["data", "date_col", "value_col"],
+                "required": ["date_col", "value_col"],
             },
         },
     },
