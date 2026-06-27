@@ -148,20 +148,27 @@ def _chunk_text(text: str, size: int = 5) -> List[str]:
 
 
 def _forecast_with_sql(kw: dict) -> dict:
+    data_raw = kw.get("data")
     sql = kw.get("sql", "").strip()
-    if sql:
-        result = execute_query(DB_PATH, sql, conn_str=DB_CONN_STRING)
+    if sql or (isinstance(data_raw, str) and data_raw.strip().lower().startswith("select")):
+        sql_to_run = sql or data_raw.strip()
+        result = execute_query(DB_PATH, sql_to_run, conn_str=DB_CONN_STRING)
         if not result.get("success"):
             return {"success": False, "error": f"SQL execution failed: {result.get('error', '')}"}
         data = result.get("rows", [])
+    elif isinstance(data_raw, str):
+        return {"success": False, "error": f"Expected data as an array, got string. Pass the SQL query via the 'sql' parameter instead."}
     else:
-        data = _normalise_data(kw.get("data", []))
-    return generate_forecast(
-        data,
-        kw.get("date_col", ""),
-        kw.get("value_col", ""),
-        int(kw.get("periods", 5)),
-    )
+        data = _normalise_data(data_raw)
+    try:
+        return generate_forecast(
+            data,
+            kw.get("date_col", ""),
+            kw.get("value_col", ""),
+            int(kw.get("periods", 5)),
+        )
+    except Exception as e:
+        return {"success": False, "error": f"Forecast failed: {e}"}
 
 def _build_tool_impl(username: str = "") -> Dict[str, Any]:
     return {
