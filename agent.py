@@ -276,35 +276,70 @@ def _call_llm(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> An
     client = _get_llm_client()
     model = NVIDIA_MODEL if LLM_PROVIDER == "nvidia" else (OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL)
 
-    try:
-        if LLM_PROVIDER == "anthropic":
-            return _call_anthropic(client, model, messages, tools)
-        else:
-            return _call_openai_compat(client, model, messages, tools)
-    except Exception as e:
-        raise RuntimeError(f"LLM API call failed ({LLM_PROVIDER}): {e}")
+    last_error = None
+    for attempt in range(4):
+        try:
+            if LLM_PROVIDER == "anthropic":
+                return _call_anthropic(client, model, messages, tools)
+            else:
+                return _call_openai_compat(client, model, messages, tools)
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            is_retryable = any(
+                kw in err_str for kw in ["429", "500", "502", "503", "timeout", "rate limit",
+                                          "too many requests", "service unavailable",
+                                          "temporary", "try again", "resource_exhausted"]
+            )
+            if is_retryable and attempt < 3:
+                wait = 2 ** attempt
+                time.sleep(wait)
+                continue
+            break
+
+    raise RuntimeError(f"LLM API call failed ({LLM_PROVIDER}): {last_error}")
 
 
 def _call_llm_stream(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]):
     client = _get_llm_client()
     model = NVIDIA_MODEL if LLM_PROVIDER == "nvidia" else (OPENAI_MODEL if LLM_PROVIDER == "openai" else ANTHROPIC_MODEL)
 
-    if LLM_PROVIDER == "anthropic":
-        text = _call_anthropic(client, model, messages, tools).content
-        for chunk in _chunk_text(text):
-            yield chunk
-    else:
-        stream = client.chat.completions.create(
-            model=model,
-            max_tokens=8192,
-            tools=tools,
-            messages=messages,
-            stream=True,
-        )
-        for chunk in stream:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            if delta and delta.content:
-                yield delta.content
+    last_error = None
+    for attempt in range(4):
+        try:
+            if LLM_PROVIDER == "anthropic":
+                text = _call_anthropic(client, model, messages, tools).content
+                for chunk in _chunk_text(text):
+                    yield chunk
+                return
+            else:
+                stream = client.chat.completions.create(
+                    model=model,
+                    max_tokens=8192,
+                    temperature=0,
+                    tools=tools,
+                    messages=messages,
+                    stream=True,
+                )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if delta and delta.content:
+                        yield delta.content
+                return
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            is_retryable = any(
+                kw in err_str for kw in ["429", "500", "502", "503", "timeout", "rate limit",
+                                         "too many requests", "service unavailable",
+                                         "temporary", "try again", "resource_exhausted"]
+            )
+            if is_retryable and attempt < 3:
+                time.sleep(2 ** attempt)
+                continue
+            break
+
+    yield f"⚠️ API error after retries: {last_error}"
 
 
 def _chunk_text(text: str, size: int = 5) -> List[str]:
