@@ -109,6 +109,59 @@ def _auto_quote_values(sql: str) -> str:
     return sql
 
 
+def _expand_aliases(sql: str) -> str:
+    """Replace table aliases (T1, T2, p, oi, etc.) with full table names.
+
+    Catches the common LLM mistake: FROM products AS T1 ... WHERE T1.category
+    and rewrites to: FROM products ... WHERE products.category
+
+    Also strips the alias from FROM/JOIN clauses so the original
+    table name can be used throughout the query.
+    """
+    import re
+
+    _SKIP = {
+        'ON', 'USING', 'WHERE', 'AND', 'OR', 'ORDER', 'GROUP', 'HAVING',
+        'LIMIT', 'INNER', 'LEFT', 'RIGHT', 'CROSS', 'OUTER', 'JOIN', 'FULL',
+        'WITH', 'SELECT', 'SET', 'BY', 'AS', 'NOT', 'IN', 'LIKE', 'BETWEEN',
+        'IS', 'NULL', 'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+        'UNION', 'ALL', 'DISTINCT', 'ASC', 'DESC', 'OFFSET',
+    }
+
+    alias_map = {}
+
+    def _drop_as(m):
+        kw = m.group(1)
+        table = m.group(2)
+        alias = m.group(3)
+        alias_map[alias] = table
+        return f"{kw} {table} "
+
+    sql = re.sub(
+        r'\b(FROM|JOIN)\s+(\w+)\s+AS\s+(\w+)\s+',
+        _drop_as, sql, flags=re.IGNORECASE,
+    )
+
+    def _drop_short(m):
+        kw = m.group(1)
+        table = m.group(2)
+        alias = m.group(3)
+        if alias.upper() in _SKIP:
+            return m.group(0)
+        alias_map[alias] = table
+        return f"{kw} {table} "
+
+    sql = re.sub(
+        r'\b(FROM|JOIN)\s+(\w+)\s+(\w{1,3})\s+',
+        _drop_short, sql, flags=re.IGNORECASE,
+    )
+
+    for alias in sorted(alias_map.keys(), key=len, reverse=True):
+        sql = re.sub(rf'\b{re.escape(alias)}\.', f'{alias_map[alias]}.', sql)
+
+    return sql
+
+
 def validate_query(sql: str) -> Dict[str, Any]:
     cleaned = sql.strip().rstrip(";")
     lowered = cleaned.lower()
@@ -144,6 +197,7 @@ def validate_query(sql: str) -> Dict[str, Any]:
             "sql": cleaned,
         }
 
+    cleaned = _expand_aliases(cleaned)
     cleaned = _auto_quote_values(cleaned)
     lowered = cleaned.lower()
 

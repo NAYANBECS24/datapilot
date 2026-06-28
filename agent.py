@@ -499,6 +499,7 @@ def _call_openai_compat(client, model: str, messages: List[Dict[str, Any]], tool
     response = client.chat.completions.create(
         model=model,
         max_tokens=8192,
+        temperature=0,
         tools=tools,
         messages=messages,
     )
@@ -638,37 +639,41 @@ DASHBOARDS:
   Pick diverse chart types (mix of bar, line, pie, scatter, choropleth).
 
 RULES:
+
+    CRITICAL SQL RULES — These are the most important rules. Follow them strictly:
+      A. NEVER use table aliases (like T1, T2, p, oi, c, o). Always write full table names:
+         "products", "order_items", "customers", "orders". SQLite handles full names fine in JOINs.
+         Example: SELECT products.name, SUM(order_items.quantity) FROM products JOIN order_items ON products.product_id = order_items.product_id
+      B. CRITICAL — ALWAYS quote string literals in WHERE/HAVING clauses with single quotes.
+         Example: WHERE category = 'Electronics' (NOT WHERE category = Electronics).
+         Unquoted string values cause SQL syntax errors. Numbers and column references should NOT be quoted.
+         Correct: WHERE category = 'Electronics' AND quantity > 5
+      C. CRITICAL — SQL COMPLETENESS: Write the ENTIRE query in one go. Never truncate or abbreviate.
+         Every clause (SELECT, FROM, JOIN ... ON, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT)
+         must be fully written. Incomplete SQL causes execution errors.
+      D. Only write read-only SELECT queries. Never DML/DDL.
+
+    General rules:
     1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
        This also discovers any user-uploaded tables.
-    2. Only write read-only SELECT queries. Never DML/DDL.
-    3. When a chart or diagram helps, call generate_chart or generate_flowchart.
-    4. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
+    2. When a chart or diagram helps, call generate_chart or generate_flowchart.
+    3. For ER diagrams, call generate_flowchart(diagram_type="er_diagram", schema=<get_schema result>).
        Pass the full result from get_schema (with 'success' and 'schema' keys) — the tool handles unwrapping.
-    5. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
-    6. After getting data, write a short clear summary with real numbers.
-    7. Suggest one follow-up question the user might ask next.
-    8. Be concise. Let charts and diagrams do the heavy lifting.
-    9. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
+    4. If execute_query returns success=false, fix the SQL and retry (up to 3 times).
+    5. After getting data, write a short clear summary with real numbers.
+    6. Suggest one follow-up question the user might ask next.
+    7. Be concise. Let charts and diagrams do the heavy lifting.
+    8. CLARIFYING QUESTIONS: If the user's query is ambiguous (e.g. "show me sales" without specifying
        a time period, ask a short clarifying question instead of guessing.
-    10. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
+    9. MULTI-HOP CONTEXT: Pay close attention to pronouns like "them", "those", "that", "these"
        in follow-up questions. They refer to entities from the previous turn, not all data.
-    11. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
+    10. CROSS-DB QUERIES: The sample DB and uploads DB are attached together in SQLite.
         You can JOIN across them using fully qualified table names (e.g. "uploads.my_table").
-    12. DOCUMENTS (RAG): When a user asks about document/report content, call retrieve_context
+    11. DOCUMENTS (RAG): When a user asks about document/report content, call retrieve_context
         to search uploaded PDF/TXT/MD files. Use the passages to inform your answer and cite the
         filename. You can combine document context with database results.
-    13. KEEP REASONING BRIEF: Do not write long chains of thought before calling a tool.
+    12. KEEP REASONING BRIEF: Do not write long chains of thought before calling a tool.
         Call the tool immediately — tool arguments must be complete and never truncated.
-    14. CRITICAL — SQL COMPLETENESS: When writing SQL, write the ENTIRE query in one go.
-        Never truncate or abbreviate. Every clause (SELECT, FROM, JOIN ... ON, WHERE, GROUP BY,
-        HAVING, ORDER BY, LIMIT) must be fully written. Incomplete SQL causes execution errors.
-     15. NEVER use table aliases (like T1, T2, p, oi, c, o). Always write full table names:
-         "products", "order_items", "customers", "orders". SQLite handles full names fine in JOINs.
-         The query validator rejects queries with missing JOIN conditions.
-     16. CRITICAL — ALWAYS quote string literals in WHERE/HAVING clauses with single quotes.
-         For example: WHERE category = 'Electronics' (NOT WHERE category = Electronics).
-         Unquoted string values cause SQL syntax errors. Numbers and column references should NOT be quoted.
-         Example correct: WHERE category = 'Electronics' AND quantity > 5
  """
 
 TOOLS = [
