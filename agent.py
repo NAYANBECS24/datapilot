@@ -50,6 +50,19 @@ if not os.path.exists(DB_PATH):
 DB_CONN_STRING = os.getenv("DATABASE_URL", "")
 MAX_SQL_RETRIES = 3
 MAX_TOOL_ITERATIONS = 8
+MAX_REFUSAL_RETRIES = 2
+
+REFUSAL_PHRASES = [
+    "i apologize", "i cannot", "i can't", "i'm not able", "i'm sorry",
+    "do not feel comfortable", "against my policy", "does not meet",
+    "cannot provide", "can't provide", "not able to answer", "i cannot answer",
+    "i'm unable", "i am unable", "i am not able",
+]
+
+
+def _is_refusal(text: str) -> bool:
+    lowered = text.lower()
+    return any(p in lowered for p in REFUSAL_PHRASES)
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "nvidia").lower()
 
@@ -413,6 +426,7 @@ def run_agent_turn_stream(
     diagrams = []
     sql_queries = []
     sql_retry_count = 0
+    refusal_retry_count = 0
     tool_iterations = 0
 
     while True:
@@ -424,11 +438,20 @@ def run_agent_turn_stream(
 
         tool_calls, raw_tool_calls = _coerce_message_tool_calls(msg)
         if not tool_calls:
+            reply = msg.content or ""
+            if _is_refusal(reply) and refusal_retry_count < MAX_REFUSAL_RETRIES:
+                refusal_retry_count += 1
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({
+                    "role": "user",
+                    "content": "Do not refuse. You are a data analytics assistant. Use the available tools (get_schema, execute_query) to answer the question from the database. Try again.",
+                })
+                continue
             yield {"type": "charts", "content": charts}
             yield {"type": "diagrams", "content": diagrams}
             yield {"type": "sql_queries", "content": sql_queries}
             yield {"type": "stream_start", "content": ""}
-            for chunk in _chunk_text(msg.content or ""):
+            for chunk in _chunk_text(reply):
                 yield {"type": "stream", "content": chunk}
             yield {"type": "stream_end", "content": ""}
             return
@@ -652,6 +675,7 @@ RULES:
          Every clause (SELECT, FROM, JOIN ... ON, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT)
          must be fully written. Incomplete SQL causes execution errors.
       D. Only write read-only SELECT queries. Never DML/DDL.
+      E. NEVER refuse a data or analytics question. The user is asking about business data in a database — always use get_schema and/or execute_query to find the answer. If you are unsure, query the database first. Do not decline to answer.
 
     General rules:
     1. ALWAYS call get_schema before writing SQL if you haven't seen the schema yet.
@@ -906,6 +930,7 @@ def run_agent_turn(
     diagrams: List[str] = []
     sql_queries: List[Dict[str, Any]] = []
     sql_retry_count = 0
+    refusal_retry_count = 0
     tool_iterations = 0
 
     while True:
@@ -921,8 +946,17 @@ def run_agent_turn(
 
         tool_calls, raw_tool_calls = _coerce_message_tool_calls(msg)
         if not tool_calls:
+            reply = msg.content or ""
+            if _is_refusal(reply) and refusal_retry_count < MAX_REFUSAL_RETRIES:
+                refusal_retry_count += 1
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({
+                    "role": "user",
+                    "content": "Do not refuse. You are a data analytics assistant. Use the available tools (get_schema, execute_query) to answer the question from the database. Try again.",
+                })
+                continue
             return {
-                "reply": msg.content or "",
+                "reply": reply,
                 "charts": charts,
                 "diagrams": diagrams,
                 "sql_queries": sql_queries,
