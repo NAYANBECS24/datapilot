@@ -37,6 +37,78 @@ BLOCKED_KEYWORDS = (
 )
 
 
+def _auto_quote_values(sql: str) -> str:
+    """Auto-quote unquoted string values in WHERE/HAVING/ON clauses.
+
+    Catches the common LLM mistake: WHERE category = Electronics
+    and fixes it to: WHERE category = 'Electronics'
+    """
+    import re
+
+    SQL_KEYWORDS = {
+        'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN',
+        'IS', 'NULL', 'AS', 'ON', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER',
+        'CROSS', 'FULL', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET',
+        'UNION', 'ALL', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+        'EXISTS', 'TRUE', 'FALSE', 'ASC', 'DESC', 'CAST',
+    }
+
+    def _needs_quoting(val: str) -> bool:
+        if len(val) == 0:
+            return False
+        if val.startswith("'") or val.startswith('"'):
+            return False
+        if val.upper() in SQL_KEYWORDS:
+            return False
+        if val.upper() == "NULL":
+            return False
+        if "." in val:
+            return False
+        if re.match(r'^[+-]?\d+(\.\d+)?$', val):
+            return False
+        if re.match(r'^[+-]?\d+\.\d+[eE][+-]?\d+$', val):
+            return False
+        return True
+
+    def _quote_op(m):
+        lhs = m.group(1)
+        op = m.group(2)
+        val = m.group(3)
+        if _needs_quoting(val):
+            return f"{lhs}{op}'{val}'"
+        return m.group(0)
+
+    def _quote_in(m):
+        before = m.group(1)
+        inside = m.group(2)
+        after = m.group(3)
+        items = [item.strip() for item in inside.split(",")]
+        quoted = []
+        for item in items:
+            if _needs_quoting(item):
+                quoted.append(f"'{item}'")
+            else:
+                quoted.append(item)
+        return f"{before}{', '.join(quoted)})"
+
+    operators = r"(=|!=|<>|>=|<=|>|<|LIKE)"
+    sql = re.sub(
+        rf"(\s+){operators}\s*([\w.]+)",
+        _quote_op,
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    sql = re.sub(
+        r"(\s+IN\s*\()([^)]+)(\))",
+        _quote_in,
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    return sql
+
+
 def validate_query(sql: str) -> Dict[str, Any]:
     cleaned = sql.strip().rstrip(";")
     lowered = cleaned.lower()
@@ -71,6 +143,9 @@ def validate_query(sql: str) -> Dict[str, Any]:
             "reason": f"Missing ON/USING clause after JOIN (found {join_count} JOIN(s) but only {on_count + using_count} ON/USING). The SQL appears truncated — write the complete query with all JOIN conditions (e.g. JOIN products ON ...).",
             "sql": cleaned,
         }
+
+    cleaned = _auto_quote_values(cleaned)
+    lowered = cleaned.lower()
 
     if "limit" not in lowered:
         cleaned = f"{cleaned} LIMIT {DEFAULT_ROW_LIMIT}"

@@ -662,10 +662,14 @@ RULES:
     14. CRITICAL — SQL COMPLETENESS: When writing SQL, write the ENTIRE query in one go.
         Never truncate or abbreviate. Every clause (SELECT, FROM, JOIN ... ON, WHERE, GROUP BY,
         HAVING, ORDER BY, LIMIT) must be fully written. Incomplete SQL causes execution errors.
-    15. NEVER use table aliases (like T1, T2, p, oi, c, o). Always write full table names:
-        "products", "order_items", "customers", "orders". SQLite handles full names fine in JOINs.
-        The query validator rejects queries with missing JOIN conditions.
-"""
+     15. NEVER use table aliases (like T1, T2, p, oi, c, o). Always write full table names:
+         "products", "order_items", "customers", "orders". SQLite handles full names fine in JOINs.
+         The query validator rejects queries with missing JOIN conditions.
+     16. CRITICAL — ALWAYS quote string literals in WHERE/HAVING clauses with single quotes.
+         For example: WHERE category = 'Electronics' (NOT WHERE category = Electronics).
+         Unquoted string values cause SQL syntax errors. Numbers and column references should NOT be quoted.
+         Example correct: WHERE category = 'Electronics' AND quantity > 5
+ """
 
 TOOLS = [
     {

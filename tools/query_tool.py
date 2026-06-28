@@ -89,7 +89,9 @@ def _sqlite_execute(db_path: str, sql: str, username: str = "") -> Dict[str, Any
     except sqlite3.Error as e:
         err = str(e)
         if "syntax error" in err.lower() and "limit" in err.lower():
-            err += " The SQL query appears to be malformed. Rewrite the complete query — do not truncate any clause. Use full table names, not aliases, and ensure all JOINs have ON conditions."
+            err += " The SQL query appears to be malformed. Rewrite the complete query — do not truncate any clause. Use full table names, not aliases, and ensure all JOINs have ON conditions. Check that all string values in WHERE clauses are enclosed in single quotes (e.g. WHERE category = 'Electronics' not WHERE category = Electronics)."
+        elif "no such column" in err.lower():
+            err += " This usually means a string value is missing single quotes (e.g. use WHERE category = 'Electronics' not WHERE category = Electronics) or a column name is misspelled."
         return {"success": False, "sql": sql, "error": err}
 
 
