@@ -6,7 +6,7 @@
 
 Chat in plain English → agent writes & runs SQL → renders charts/diagrams → explains insights. Built with self-healing SQL, real-time streaming, transparent agent traces, glassmorphism UI, and a living pinned dashboard.
 
-[![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)](https://github.com/NAYANBECS24/eunoia)
+[![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)](https://github.com/NAYANBECS24/eunoia)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -18,10 +18,12 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | **Core** | Natural language → SQL agent | ✅ |
 | | Real-time streaming responses | ✅ Word-level animation via `st.write_stream()` |
 | | Self-healing SQL retry loop | ✅ Failed queries auto-fix via LLM (3 attempts) |
+| | SQL truncation detection | ✅ Catches incomplete JOINs & unbalanced parens before SQLite |
 | | Live Agent Trace sidebar | ✅ Every tool call with latency — proves the agent is really working |
 | | Glass-box SQL transparency | ✅ Every generated SQL shown in collapsible panel |
 | | Chat Persistence & Multi-Chat Sessions | ✅ Auto-saves every conversation, new/load/delete from sidebar |
 | **Charts & Visuals** | 7 chart types | ✅ Bar, line, pie, scatter, choropleth, scatter_mapbox, auto |
+| | Forecast auto-chart | ✅ `forecast_data` returns a Plotly figure, auto-displayed in chat |
 | | Smart chart recommendation | ✅ Auto-detects time-series, proportions, categories, location data |
 | | Geographic Maps | ✅ Choropleth (country/state) + scatter_mapbox (lat/lon) |
 | | Schema-grounded ER diagrams | ✅ Deterministic from real foreign keys |
@@ -58,7 +60,8 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 | | Voice input | ✅ Browser Speech Recognition (Chrome, Edge, Safari) |
 | **Infrastructure** | Multi-DB support | ✅ SQLite, PostgreSQL, MySQL, MongoDB |
 | | Read-only SQL guardrail | ✅ Blocks INSERT/UPDATE/DELETE/DROP/ALTER |
-| | GitHub Actions CI | ✅ Auto-runs 85 tests on every push |
+| | Robust JSON serialization | ✅ Numpy arrays, Plotly figures, ndarrays all safely serialized |
+| | GitHub Actions CI | ✅ Auto-runs 86 tests on every push |
 | | Docker support | ✅ Dockerfile + docker-compose.yml |
 
 ---
@@ -220,7 +223,7 @@ python tools/chart_tool.py       # generates all 7 chart types
 python tools/flowchart_tool.py   # prints ER + process-flow + decision-tree Mermaid
 python tools/insight_tool.py     # runs anomaly detection + auto insights on sample data
 python tools/ml_tool.py          # trains forecast model on order_items table
-python -m pytest tests/ -v       # 85 tests, all passing
+python -m pytest tests/ -v       # 86 tests, all passing
 ```
 
 ---
@@ -439,7 +442,7 @@ The agent tracks pronouns across turns. *"Show top customers"* → *"Which are f
 The sample DB and uploads DB are SQLite-attached. The agent can write queries that `JOIN` across both — e.g., `SELECT * FROM orders JOIN uploads.my_table`.
 
 ### Self-Healing SQL
-If `execute_query` returns an error, the agent automatically retries with a corrected SQL query (up to 3 attempts).
+If `execute_query` returns an error, the agent automatically retries with a corrected SQL query (up to 3 attempts). SQL truncation is caught before reaching the database — `validate_query` checks for unbalanced parentheses and incomplete JOIN clauses, returning actionable error messages the LLM can fix.
 
 ---
 

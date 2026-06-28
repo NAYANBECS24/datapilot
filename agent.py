@@ -313,14 +313,13 @@ def _call_llm_stream(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
                     yield chunk
                 return
             else:
-                stream = client.chat.completions.create(
-                    model=model,
-                    max_tokens=8192,
-                    temperature=0,
-                    tools=tools,
-                    messages=messages,
-                    stream=True,
-                )
+                extra = None
+                if "nemotron" in model.lower():
+                    extra = {"chat_template_kwargs": {"enable_thinking": True, "force_nonempty_content": True}}
+                stream_kwargs: Dict[str, Any] = dict(model=model, max_tokens=8192, temperature=0, tools=tools, messages=messages, stream=True)
+                if extra:
+                    stream_kwargs["extra_body"] = extra
+                stream = client.chat.completions.create(**stream_kwargs)
                 for chunk in stream:
                     delta = chunk.choices[0].delta if chunk.choices else None
                     if delta and delta.content:
@@ -554,13 +553,13 @@ def run_agent_turn_stream(
 
 
 def _call_openai_compat(client, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Any:
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=8192,
-        temperature=0,
-        tools=tools,
-        messages=messages,
-    )
+    extra = None
+    if "nemotron" in model.lower():
+        extra = {"chat_template_kwargs": {"enable_thinking": True, "force_nonempty_content": True}}
+    kwargs: Dict[str, Any] = dict(model=model, max_tokens=8192, temperature=0, tools=tools, messages=messages)
+    if extra:
+        kwargs["extra_body"] = extra
+    response = client.chat.completions.create(**kwargs)
     return response.choices[0].message
 
 
