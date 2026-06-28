@@ -6,8 +6,9 @@
 
 Chat in plain English → agent writes & runs SQL → renders charts/diagrams → explains insights. Built with self-healing SQL, real-time streaming, transparent agent traces, glassmorphism UI, and a living pinned dashboard.
 
-[![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)](https://github.com/NAYANBECS24/eunoia)
+[![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)](https://github.com/NAYANBECS24/datapilot)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Live App](https://img.shields.io/badge/live-app-blueviolet)](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
 
 ---
 
@@ -70,8 +71,8 @@ Chat in plain English → agent writes & runs SQL → renders charts/diagrams �
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/NAYANBECS24/eunoia.git
-cd eunoia
+git clone https://github.com/NAYANBECS24/datapilot.git
+cd datapilot
 python -m venv venv
 # Windows: venv\Scripts\activate
 # Mac/Linux: source venv/bin/activate
@@ -562,9 +563,9 @@ Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak 
 
 ## LLM Providers
 
-| Provider | Env Variable | Default Model |
+| Provider | Env Variable(s) | Default Model |
 |---|---|---|
-| NVIDIA (free, default) | `OPENAI_API_KEY=nvapi-...` | `meta/llama-3.1-70b-instruct` |
+| NVIDIA (free, default) | `OPENAI_API_KEY=nvapi-...`<br>`NVIDIA_MODEL=...` (optional) | `meta/llama-3.1-70b-instruct` |
 | OpenAI | `OPENAI_API_KEY=sk-...` + `LLM_PROVIDER=openai` | `gpt-4o-mini` |
 | Anthropic | `ANTHROPIC_API_KEY=sk-ant-...` + `LLM_PROVIDER=anthropic` | `claude-3-5-haiku-latest` |
 
@@ -588,9 +589,11 @@ Enable **Voice Input** in Settings (`🎤 Voice ON`). Click **Start** and speak 
 
 ### Streamlit Community Cloud (free)
 
+**Live app:** [datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app](https://datapilot-cxlnroofhvbh95qbkyhccg.streamlit.app/)
+
 1. Push this repo to GitHub:
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/eunoia.git
+git remote add origin https://github.com/NAYANBECS24/datapilot.git
 git push -u origin master
 ```
 
